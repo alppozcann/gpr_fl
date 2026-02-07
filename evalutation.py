@@ -1,113 +1,74 @@
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc, classification_report
+import torch
+from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_fscore_support
 
-def find_optimal_threshold(y_true, y_pred_continuous):
+def detailed_analysis(client):
     """
-    ROC eğrisinden Youden's J statistic kullanarak optimal threshold bulur.
-    J = Sensitivity + Specificity - 1 = TPR - FPR
+    GPyTorch Client'ı için detaylı analiz yapar.
+    Veri tiplerini ve boyutlarını sklearn için zorla düzeltir.
     """
-    fpr, tpr, thresholds = roc_curve(y_true, y_pred_continuous)
     
-    # Youden's J statistic: TPR - FPR'yi maksimize et
-    j_scores = tpr - fpr
-    best_idx = np.argmax(j_scores)
-    optimal_threshold = thresholds[best_idx]
+    # 1. Tahmin Al (GPyTorch'tan)
+    # y_pred_raw bir tensör veya numpy array olabilir, garantileyeceğiz
+    y_pred_raw, y_var = client.predict()
     
-    # Eğer threshold inf veya çok büyükse, tahmin aralığının medyanını kullan
-    if np.isinf(optimal_threshold) or optimal_threshold > y_pred_continuous.max():
-        optimal_threshold = np.median(y_pred_continuous)
-        print(f"  ⚠️ ROC optimal threshold geçersiz, medyan kullanılıyor: {optimal_threshold:.4f}")
+    # 2. Gerçek Değerleri (Test Y) Al ve Dönüştür
+    y_true = client.test_y
     
-    return optimal_threshold, fpr, tpr, thresholds, best_idx
+    # Eğer Tensor ise Numpy'a çevir (CPU'ya alarak)
+    if torch.is_tensor(y_true):
+        y_true = y_true.cpu().numpy()
+    
+    if torch.is_tensor(y_pred_raw):
+        y_pred_raw = y_pred_raw.cpu().numpy()
+        
+    # --- KRİTİK DÜZELTME: FLATTEN (DÜZLEŞTİRME) ---
+    # [[0], [1]] şeklindeki (N, 1) matrisi [0, 1] şeklindeki (N,) dizisine çevirir.
+    y_true = y_true.flatten()
+    y_pred_raw = y_pred_raw.flatten()
+    
+    # y_true'nun kesinlikle Tamsayı olduğundan emin ol
+    y_true = y_true.astype(int)
 
-def predict_with_dynamic_threshold(client):
-    # Ham olasılıkları al
-    y_pred_raw, _ = client.learner.predict(client.X_test)
-    y_true = client.y_test
-    
-    # ROC eğrisinden optimal threshold bul (Youden's J statistic)
-    optimal_threshold, _, _, _, _ = find_optimal_threshold(y_true, y_pred_raw)
-    
-    print(f"Client {client.id} için Optimal Threshold (ROC): {optimal_threshold:.4f}")
-    print(f"  - Tahmin Aralığı: [{y_pred_raw.min():.4f}, {y_pred_raw.max():.4f}]")
-    print(f"  - Tahmin Ortalaması: {y_pred_raw.mean():.4f}")
-    
-    # Optimal threshold ile tahminler
-    y_pred_binary = (y_pred_raw >= optimal_threshold).astype(int)
-    
-    return y_pred_binary, optimal_threshold
-
-def detailed_analysis(client, use_optimal_threshold=True):
-    print(f"\n--- Client {client.id} Detaylı Performans Analizi ---")
-    
-    # 1. Tahminleri Al (Regression çıktısı: 0.1, 0.9 vb.)
-    y_pred_continuous, sigma = client.learner.predict(client.X_test)
-    y_true = client.y_test
-    
-    # 2. Optimal threshold kullan veya sabit 0.25
-    if use_optimal_threshold:
-        threshold, fpr, tpr, thresholds, best_idx = find_optimal_threshold(y_true, y_pred_continuous)
-        print(f"🎯 Kullanılan Optimal Threshold: {threshold:.4f}")
+    # Çok sınıflıysa ikiliye çevir (0: negatif, diğerleri: pozitif)
+    unique_labels = np.unique(y_true)
+    if unique_labels.size > 2:
+        y_true = (y_true != 0).astype(int)
     else:
-        threshold = 0.25
-        fpr, tpr, thresholds = roc_curve(y_true, y_pred_continuous)
-        best_idx = None
+        # {0,1} dışında iki sınıf varsa yeniden eşle
+        if not np.array_equal(unique_labels, np.array([0, 1])):
+            y_true = (y_true == unique_labels.max()).astype(int)
     
-    y_pred_binary = (y_pred_continuous >= threshold).astype(int)
+    # 3. Optimal Threshold Bulma
+    fpr, tpr, thresholds = roc_curve(y_true, y_pred_raw)
     
-    # 3. TP, TN, FP, FN Hesapla
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred_binary).ravel()
+    if len(thresholds) > 0:
+        optimal_idx = np.argmax(tpr - fpr)
+        optimal_threshold = thresholds[optimal_idx]
+    else:
+        optimal_threshold = 0.5
     
-    print(f"✅ True Positive (Doğru Teşhis - Hasta): {tp}")
-    print(f"✅ True Negative (Doğru Teşhis - Sağlam): {tn}")
-    print(f"❌ False Positive (Yanlış Alarm - Sağlam ama Hasta dedik): {fp}")
-    print(f"❌ False Negative (Kaçırılan - Hasta ama Sağlam dedik): {fn}")
+    # 4. Binary Tahmin
+    y_pred_binary = (y_pred_raw > optimal_threshold).astype(int)
     
-    # Recall ve Precision hesapla
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    
-    print(f"\n📊 Hasta Sınıfı için Metrikler:")
-    print(f"  - Recall (Sensitivity): {recall:.2%} - Hastaların ne kadarını yakaladık")
-    print(f"  - Precision: {precision:.2%} - Hasta dediklerimizin ne kadarı gerçekten hasta")
-    print(f"  - F1-Score: {f1:.2%}")
-    
-    # Skor Raporu
-    print("\n--- Sınıflandırma Raporu ---")
-    print(classification_report(y_true, y_pred_binary, zero_division=0))
-
-    # --- GRAFİK ÇİZİMİ ---
-    fig, ax = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # Grafik 1: Confusion Matrix (Karmaşıklık Matrisi)
-    cm_display = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix(y_true, y_pred_binary), 
-                                      display_labels=["Sağlam (0)", "Diyabet (1)"])
-    cm_display.plot(ax=ax[0], cmap='Blues', values_format='d')
-    ax[0].set_title(f'Confusion Matrix (Client {client.id})\nThreshold: {threshold:.4f}')
-    
-    # Grafik 2: ROC Eğrisi (Modelin ayrım gücü)
+    # 5. Metrikler
+    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred_binary, average='binary', zero_division=0)
     roc_auc = auc(fpr, tpr)
     
-    ax[1].plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
-    ax[1].plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random (AUC = 0.50)')
-    
-    # Optimal threshold noktasını işaretle
-    if use_optimal_threshold and best_idx is not None:
-        ax[1].scatter(fpr[best_idx], tpr[best_idx], color='red', s=100, zorder=5, 
-                     label=f'Optimal Point (thresh={threshold:.3f})')
-    
-    ax[1].set_xlim([0.0, 1.0])
-    ax[1].set_ylim([0.0, 1.05])
-    ax[1].set_xlabel('False Positive Rate')
-    ax[1].set_ylabel('True Positive Rate')
-    ax[1].set_title(f'ROC Eğrisi (Client {client.id})')
-    ax[1].legend(loc="lower right")
-    ax[1].grid(alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(f"client_{client.id}_result.png")
-    plt.show()
-    
-    return {'threshold': threshold, 'recall': recall, 'precision': precision, 'f1': f1, 'auc': roc_auc}
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred_binary).ravel()
+
+    return {
+        'threshold': optimal_threshold,
+        'recall': recall,
+        'precision': precision,
+        'f1': f1,
+        'auc': roc_auc,
+        'tp': tp,
+        'tn': tn,
+        'fp': fp,
+        'fn': fn
+    }
+
+# main.py uyumluluğu için boş fonksiyon
+def predict_with_dynamic_threshold(client):
+    pass

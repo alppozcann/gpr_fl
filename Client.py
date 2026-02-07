@@ -7,16 +7,13 @@ from sklearn.preprocessing import StandardScaler
 
 class GPModel:
     def __init__(self):
-        # 1. SINIRLARI GENİŞLETİYORUZ
-        # Constant (Varyans): 1e-3 (0.001) yerine 1e-4 (0.0001) ve 1e4 (10000) yapıyoruz.
-        # RBF (Length Scale): 1e-2 yerine 1e-5 (çok ince detay) ve 1e5 (çok genel) yapıyoruz.
         kernel = C(1.0, (1e-4, 1e4)) * RBF(1.0, (1e-5, 1e5))
 
         self.model = GaussianProcessRegressor(
             kernel=kernel,
-            n_restarts_optimizer=10,  # 2. Pes etmemesi için deneme sayısını 5'ten 10'a çıkardık
-            normalize_y=True,         # Hedef değişkeni normalize etmeye devam et
-            alpha=1e-2,               # 3. KRİTİK NOKTA: Gürültü toleransı (Noise)
+            n_restarts_optimizer=10,  
+            normalize_y=True,         
+            alpha=1e-2,              
             random_state=42
         )
     
