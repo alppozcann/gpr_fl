@@ -5,6 +5,8 @@ import numpy as np
 from evalutation import detailed_analysis
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
+import torch
+import gpytorch
 
 clients = [] 
 client_updates = {}
@@ -57,12 +59,12 @@ for cid, r in results.items():
                    [r['fn'], r['tp']]])
     
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, 
-                                  display_labels=["Sağlam (0)", "Diyabet (1)"])
+                                  display_labels=["Non-Diabetic (0)", "Diabetic (1)"])
     
     fig, ax = plt.subplots(figsize=(6, 5))
     disp.plot(cmap='Blues', ax=ax, values_format='d')
     
-    plt.title(f"Confusion Matrix (Client {cid})\nThreshold: {r['threshold']:.4f}")
+    plt.title(f"Confusion Matrix for Client {cid}")
     
     filename = f"client_{cid}_confusion_matrix.png"
     plt.savefig(filename, dpi=300) 

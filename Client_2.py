@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
 # Bu sınıf artık bir PyTorch Modeli gibi davranacak
 class GPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
@@ -37,10 +40,9 @@ class Client:
         X = pd.get_dummies(X, drop_first=True)
         X_scaled = scaler.fit_transform(X)
         
-        self.X_tensor = torch.tensor(X_scaled).float()
-        self.y_tensor = torch.tensor(y.values).float()
-
-        limit = 1000
+        self.X_tensor = torch.tensor(X_scaled).float().to(device)
+        self.y_tensor = torch.tensor(y.values).float().to(device)
+        limit = 2000
         self.X_tensor = self.X_tensor[:limit]
         self.y_tensor = self.y_tensor[:limit]
 
@@ -51,8 +53,8 @@ class Client:
         self.test_x = self.X_tensor[train_size:]
         self.test_y = self.y_tensor[train_size:]
         
-        self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        self.model = GPModel(self.train_x, self.train_y, self.likelihood)
+        self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(device)
+        self.model = GPModel(self.train_x, self.train_y, self.likelihood).to(device)
         
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
         
@@ -101,8 +103,8 @@ class Client:
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             observed_pred = self.likelihood(self.model(X_test_tensor))
             
-            y_pred = observed_pred.mean.numpy()
-            y_var = observed_pred.variance.numpy()
+            y_pred = observed_pred.mean.detach().cpu().numpy()
+            y_var = observed_pred.variance.detach().cpu().numpy()
             
         return y_pred, y_var
 
@@ -111,8 +113,8 @@ class Client:
         new_output_scale = np.exp(params[0])
         new_length_scale = np.exp(params[1])
         
-        self.model.covar_module.outputscale = torch.tensor(new_output_scale)
-        self.model.covar_module.base_kernel.lengthscale = torch.tensor([[new_length_scale]])
+        self.model.covar_module.outputscale = torch.tensor(new_output_scale, device=device)
+        self.model.covar_module.base_kernel.lengthscale = torch.tensor([[new_length_scale]], device=device)
 
     def get_params(self):
         return self.model.covar_module.outputscale,self.model.covar_module.base_kernel.lengthscale
