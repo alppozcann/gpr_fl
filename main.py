@@ -1,114 +1,473 @@
 import pandas as pd
 import numpy as np
-import os
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
-from Client_2 import Client
-from Server import weighted_average_aggregation  # Server'ı değiştireceğiz
-from evaluation import get_metrics # Senin analiz kodun
+from Client import Client, MIN_CLUSTER_SIZE
+from Server import weighted_average_aggregation
+from evaluation import get_metrics
+from visualize import visualize_clients
+import os
 
-# --- AYARLAR ---
-csv_path = "diabetes_2.csv"
-feature_to_cluster = "Pregnancies"  # Hoca BMI, Age, Glucose vb. istemişti
-device = "cpu" # GPU hatası almamak için
+NUM_FL_ROUNDS = 3
+LOCAL_EPOCHS_PER_ROUND = 20
 
-# 1. Veriyi Yükle ve Hazırla
-print(f"📂 Veri Yükleniyor: {csv_path}")
-df = pd.read_csv(csv_path)
+csv_file = os.path.join("dataset_2/","diabetes_2.csv") 
+features_to_test = ["Pregnancies","Glucose","BloodPressure","SkinThickness","Insulin","BMI","DiabetesPedigreeFunction","Age"] 
+output_file = os.path.join("dataset_2/","results.txt")
+plots_dir = os.path.join("dataset_2/","plots")
+os.makedirs(plots_dir, exist_ok=True)
 
-# 2. Optimal Küme Sayısını Bul (Makale Bölüm 4: Silhouette Score) [cite: 450]
-print(f"\n🔍 '{feature_to_cluster}' özelliği için K-Means ve Silhouette Analizi yapılıyor...")
+# Medical thresholds based on clinical guidelines (from paper methodology)
+MEDICAL_THRESHOLDS = {
+    "Glucose": {
+        "bins": [0, 70, 100, 126, float('inf')],
+        "labels": ["Low (<70)", "Normal (70-99)", "Pre-diabetes (100-125)", "Diabetes (>=126)"]
+    },
+    "BMI": {
+        "bins": [0, 18.5, 25, 30, 35, 40, float('inf')],
+        "labels": ["Underweight (<18.5)", "Healthy (18.5-24.9)", "Overweight (25-29.9)", 
+                   "Obesity I (30-34.9)", "Obesity II (35-39.9)", "Obesity III (>=40)"]
+    }
+}
 
-X_cluster = df[[feature_to_cluster]].values
-best_score = -1
-best_k = 2
-best_labels = None
+# Paper's aggregated results for comparison
+PAPER_RESULTS = {
+    "Pregnancies": {"LR": [0.7338, 0.6167, 0.6727, 0.6435], "RFC": [0.7338, 0.6167, 0.6727, 0.6435]},
+    "Glucose": {"LR": [0.7662, 0.7436, 0.5273, 0.6170], "RFC": [0.6883, 0.8889, 0.1455, 0.2500]},
+    "BloodPressure": {"LR": [0.7792, 0.7333, 0.6000, 0.6600], "RFC": [0.7662, 0.6462, 0.7636, 0.7000]},
+    "SkinThickness": {"LR": [0.7615, 0.6591, 0.7250, 0.6905], "RFC": [0.7615, 0.7188, 0.5750, 0.6389]},
+    "Insulin": {"LR": [0.7848, 0.6667, 0.6400, 0.6531], "RFC": [0.7595, 0.6667, 0.4800, 0.5581]},
+    "BMI": {"LR": [0.6818, 0.5417, 0.7091, 0.6142], "RFC": [0.7078, 0.7500, 0.2727, 0.4000]},
+    "DiabetesPedigreeFunction": {"LR": [0.7468, 0.6379, 0.6727, 0.6549], "RFC": [0.7273, 0.6000, 0.7091, 0.6500]},
+    "Age": {"LR": [0.7143, 0.5821, 0.7091, 0.6393], "RFC": [0.7273, 0.6102, 0.6545, 0.6316]}
+}
 
-# 2'den 5'e kadar küme sayılarını dene
-for k in range(2, 3):
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(X_cluster)
-    score = silhouette_score(X_cluster, labels)
-    print(f"   k={k} -> Silhouette Score: {score:.4f}")
+# Paper's local (per-cluster) results for comparison
+PAPER_LOCAL_RESULTS = {
+    "Pregnancies": {
+        0: {"LR": [0.7766, 0.6071, 0.6296, 0.6182], "RFC": [0.7553, 0.5667, 0.6296, 0.5965]},
+        1: {"LR": [0.6667, 0.6250, 0.7143, 0.6667], "RFC": [0.7000, 0.6667, 0.7143, 0.6897]}
+    },
+    "Glucose": {
+        "Normal (70-99)": {"LR": [0.9048, 0.0000, 0.0000, 0.0000], "RFC": [0.9048, 0.0000, 0.0000, 0.0000]},
+        "Pre-diabetes (100-125)": {"LR": [0.7000, 0.2500, 0.0769, 0.1176], "RFC": [0.7600, 1.0000, 0.0769, 0.1429]},
+        "Diabetes (>=126)": {"LR": [0.7167, 0.8000, 0.7368, 0.7671], "RFC": [0.4667, 0.8750, 0.1842, 0.3043]}
+    },
+    "BMI": {
+        "Healthy (18.5-24.9)": {"LR": [0.8000, 0.0000, 0.0000, 0.0000], "RFC": [0.8500, 0.5000, 0.2500, 0.3333]},
+        "Overweight (25-29.9)": {"LR": [0.7500, 0.5000, 0.2857, 0.3636], "RFC": [0.7917, 0.6667, 0.2857, 0.4000]},
+        "Obesity I (30-34.9)": {"LR": [0.6667, 0.5652, 0.7647, 0.6500], "RFC": [0.6889, 0.5714, 0.7059, 0.6316]},
+        "Obesity II (35-39.9)": {"LR": [0.6333, 0.5714, 0.8000, 0.6667], "RFC": [0.7333, 0.7500, 0.6000, 0.6667]},
+        "Obesity III (>=40)": {"LR": [0.6500, 0.6364, 0.7778, 0.7000], "RFC": [0.6500, 0.7143, 0.5556, 0.6250]}
+    },
+    "Insulin": {
+        0: {"LR": [0.7857, 0.7273, 1.0000, 0.8421], "RFC": [0.7143, 0.8333, 0.6250, 0.7143]},
+        1: {"LR": [0.7846, 0.6154, 0.4706, 0.5333], "RFC": [0.7692, 0.5833, 0.4118, 0.4828]}
+    },
+    "BloodPressure": {
+        0: {"LR": [0.7832, 0.7368, 0.5714, 0.6437], "RFC": [0.7762, 0.6441, 0.7755, 0.7037]},
+        1: {"LR": [0.7273, 0.7143, 0.8333, 0.7692], "RFC": [0.6364, 0.6667, 0.6667, 0.6667]}
+    }
+}
+
+# Cluster mapping for GP-FL client IDs to paper cluster labels
+CLUSTER_MAPPING = {
+    "Pregnancies": {1: 0, 2: 1},
+    "BloodPressure": {1: 0, 2: 1},
+    "Insulin": {1: 0, 2: 1},
+    "Glucose": {2: "Normal (70-99)", 3: "Pre-diabetes (100-125)", 4: "Diabetes (>=126)"},
+    "BMI": {2: "Healthy (18.5-24.9)", 3: "Overweight (25-29.9)", 4: "Obesity I (30-34.9)", 5: "Obesity II (35-39.9)", 6: "Obesity III (>=40)"}
+}
+
+# Store GP-FL results during experiments
+gp_fl_results = {}
+gp_fl_local_results = {}
+
+def get_medical_clusters(df, feature_name):
+    """Assign clusters based on predefined medical thresholds."""
+    thresholds = MEDICAL_THRESHOLDS[feature_name]
+    bins = thresholds["bins"]
+    labels = thresholds["labels"]
     
-    if score > best_score:
-        best_score = score
-        best_k = k
-        best_labels = labels
-
-print(f"✅ En iyi küme sayısı (k): {best_k} (Skor: {best_score:.4f})")
-
-# 3. Veriyi Parçala ve Geçici Dosyalara Kaydet
-df['cluster_id'] = best_labels
-clients = []
-
-print("\n📦 Veri Kümeleri Client'lara Dağıtılıyor...")
-for i in range(best_k):
-    # O kümeye ait veriyi çek
-    cluster_data = df[df['cluster_id'] == i].drop(columns=['cluster_id'])
+    # Use pd.cut to bin values
+    df['cluster_id'] = pd.cut(df[feature_name], bins=bins, labels=range(len(labels)), right=False)
+    df['cluster_id'] = df['cluster_id'].astype(int)
     
-    # Dosyaya kaydet (Client okuyabilsin diye)
-    temp_file = f"cluster_{feature_to_cluster}_{i}.csv"
-    cluster_data.to_csv(temp_file, index=False)
+    # Get cluster names for reporting
+    cluster_names = {i: labels[i] for i in range(len(labels))}
     
-    # Client Oluştur
-    print(f"   -> Client {i+1} oluşturuldu: {feature_to_cluster} Grubu {i} (Veri Sayısı: {len(cluster_data)})")
-    client = Client(client_id=i+1, csv_path=temp_file)
-    clients.append(client)
+    return df, len(labels), cluster_names
 
-# 4. Eğitim Döngüsü
-client_updates = []
-client_sizes = []
-
-print("\n🔄 Federe Eğitim Başlıyor...")
-
-for client in clients:
-    # Her client kendi "uzmanlık alanında" (cluster) eğitiliyor [cite: 390]
-    client.train_local(training_iter=50)
+def get_kmeans_clusters(df, feature_name):
+    """Assign clusters using K-means with silhouette score optimization."""
+    X_cluster = df[[feature_name]].values
     
-    # Parametreleri ve Veri Sayısını al (Ağırlıklı ortalama için lazım)
-    params = client.send_params()
-    if params is not None:
-        client_updates.append(params)
-        client_sizes.append(len(client.train_x)) # Veri sayısı
-
-# 5. Global Model Oluşturma (Aggregation)
-# Makale: "weighted the cluster-specific coefficients according to sample sizes" 
-print("\n🔗 Global Model Birleştiriliyor (Weighted Average)...")
-global_params = weighted_average_aggregation(client_updates, client_sizes)
-
-# 6. Sonuçları Dağıt ve Test Et
-# ... (Önceki kodların aynı kalsın) ...
-
-print("\n" + "="*60)
-print("📊 DETAYLI SONUÇ RAPORU")
-print("="*60)
-
-for client in clients:
-    # 1. Yerel Model (Specialized) Sonuçları
-    print(f"\n🔹 Client {client.id} (Yerel / Specialized Model)")
-    # Not: Parametreleri set etmeden önce ölçüm yapmalısın veya parametreleri saklayıp geri yüklemelisin.
-    # Ancak akış gereği şu an model zaten yerel eğitilmiş durumda.
-    metrics_local = get_metrics(client)
+    best_score, best_k, best_labels = -1, 2, None
+    for k in range(2, 6):
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(X_cluster)
+        score = silhouette_score(X_cluster, labels)
+        if score > best_score:
+            best_score, best_k, best_labels = score, k, labels
     
-    print(f"   {'Metric':<15} {'Score':<10}")
-    print(f"   {'-'*25}")
-    for key, value in metrics_local.items():
-        print(f"   {key.capitalize():<15} {value:.4f}")
+    df['cluster_id'] = best_labels
     
-    # 2. Global Model (Aggregated) Sonuçları
-    # Server'dan gelen ortalama parametreleri yüklüyoruz
-    client.set_params(global_params)
+    # Create cluster names based on value ranges
+    cluster_names = {}
+    for i in range(best_k):
+        cluster_vals = df[df['cluster_id'] == i][feature_name]
+        cluster_names[i] = f"Cluster {i} ({cluster_vals.min():.1f}-{cluster_vals.max():.1f})"
     
-    print(f"\n🔸 Client {client.id} (Global / Aggregated Model)")
-    metrics_global = get_metrics(client)
+    return df, best_k, cluster_names
+
+def run_experiment(feature_name):
+    df_full = pd.read_csv(csv_file)
     
-    print(f"   {'Metric':<15} {'Score':<10}")
-    print(f"   {'-'*25}")
-    for key, value in metrics_global.items():
-        print(f"   {key.capitalize():<15} {value:.4f}")
+    # Use medical thresholds for Glucose and BMI, K-means for others
+    if feature_name in MEDICAL_THRESHOLDS:
+        df_full, num_clusters, cluster_names = get_medical_clusters(df_full, feature_name)
+        clustering_method = "Medical Thresholds"
+    else:
+        df_full, num_clusters, cluster_names = get_kmeans_clusters(df_full, feature_name)
+        clustering_method = "K-Means"
+    clients = []
+    client_sizes = []
+    valid_cluster_names = {}
+    
+    for i in range(num_clusters):
+        cluster_df = df_full[df_full['cluster_id'] == i].drop(columns=['cluster_id'])
+        if len(cluster_df) < MIN_CLUSTER_SIZE:
+            continue
+        temp_csv = f"temp_cluster_{i}.csv"
+        cluster_df.to_csv(temp_csv, index=False)
         
-    print("-" * 60)
+        client = Client(client_id=i+1, csv_path=temp_csv)
+        if client.has_data:
+            clients.append(client)
+            client_sizes.append(len(client.train_x))
+            valid_cluster_names[client.id] = cluster_names[i]
+    
+    if len(clients) < 2:
+        for i in range(num_clusters):
+            temp_csv = f"temp_cluster_{i}.csv"
+            if os.path.exists(temp_csv):
+                os.remove(temp_csv)
+        return f"\n{feature_name}: Not enough valid clients (need >= 2)\n"
+    
+    # Single round: train locally, then aggregate once
+    client_updates = []
+    for client in clients:
+        client.train_local(training_iter=50)
+        params = client.send_params()
+        if params is not None:
+            client_updates.append(params)
+    
+    global_params = weighted_average_aggregation(client_updates, client_sizes)
+    
+    for client in clients:
+        client.set_params(global_params)
+    
+    # Multiple FL rounds (commented out)
+    # for fl_round in range(NUM_FL_ROUNDS):
+    #     client_updates = []
+    #     
+    #     for client in clients:
+    #         client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND)
+    #         params = client.send_params()
+    #         if params is not None:
+    #             client_updates.append(params)
+    #     
+    #     global_params = weighted_average_aggregation(client_updates, client_sizes)
+    #     
+    #     for client in clients:
+    #         client.set_params(global_params)
+    
+    for i in range(num_clusters):
+        temp_csv = f"temp_cluster_{i}.csv"
+        if os.path.exists(temp_csv):
+            os.remove(temp_csv)
+    
+    report = []
+    report.append(f"\n{'='*60}\n")
+    report.append(f"FEATURE: {feature_name.upper()} | CLUSTERS: {len(clients)} | METHOD: {clustering_method}\n")
+    report.append(f"{'='*60}\n")
+    
+    for client in clients:
+        m_global = get_metrics(client)
+        cluster_label = valid_cluster_names.get(client.id, f"Cluster {client.id}")
+        
+        report.append(f"Client {client.id} - {cluster_label} (n={len(client.train_x)+len(client.test_x)}):\n")
+        report.append(f"  Metric      | Value    \n")
+        report.append(f"  ------------|----------\n")
+        for key in m_global.keys():
+            report.append(f"  {key.capitalize():<11} | {m_global[key]:.4f}\n")
+        report.append(f"{'-'*40}\n")
+    
+    visualize_clients(clients, feature_name, plots_dir)
+    
+    # Store results for comparison
+    gp_fl_results[feature_name] = []
+    gp_fl_local_results[feature_name] = {}
+    for client in clients:
+        m = get_metrics(client)
+        gp_fl_results[feature_name].append([m['accuracy'], m['precision'], m['recall'], m['f1']])
+        gp_fl_local_results[feature_name][client.id] = [m['accuracy'], m['precision'], m['recall'], m['f1']]
+        
+    return "".join(report)
 
-# Temizlik (Geçici dosyaları sil)
-for i in range(best_k): os.remove(f"cluster_{feature_to_cluster}_{i}.csv")
+
+def create_comparison_table(feature):
+    """Create comparison table for a single feature."""
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.axis('off')
+    
+    clients = gp_fl_results[feature]
+    gp_avg = [np.mean([c[i] for c in clients]) for i in range(4)]
+    
+    table_data = [
+        ["Model", "Accuracy", "Precision", "Recall", "F1", "Best?"],
+        ["LR (Paper)", f"{PAPER_RESULTS[feature]['LR'][0]:.4f}", f"{PAPER_RESULTS[feature]['LR'][1]:.4f}", 
+         f"{PAPER_RESULTS[feature]['LR'][2]:.4f}", f"{PAPER_RESULTS[feature]['LR'][3]:.4f}", ""],
+        ["RFC (Paper)", f"{PAPER_RESULTS[feature]['RFC'][0]:.4f}", f"{PAPER_RESULTS[feature]['RFC'][1]:.4f}", 
+         f"{PAPER_RESULTS[feature]['RFC'][2]:.4f}", f"{PAPER_RESULTS[feature]['RFC'][3]:.4f}", ""],
+        ["GP-FL (Ours)", f"{gp_avg[0]:.4f}", f"{gp_avg[1]:.4f}", f"{gp_avg[2]:.4f}", f"{gp_avg[3]:.4f}", ""]
+    ]
+    
+    for metric_idx in range(4):
+        values = [PAPER_RESULTS[feature]['LR'][metric_idx], PAPER_RESULTS[feature]['RFC'][metric_idx], gp_avg[metric_idx]]
+        if np.argmax(values) == 2:
+            table_data[3][5] = "✓" if table_data[3][5] == "" else table_data[3][5] + "✓"
+    
+    colors = [['#4472C4']*6, ['#D6DCE4']*6, ['#D6DCE4']*6]
+    gp_row_color = ['#E2EFDA']
+    for i in range(4):
+        lr_val, rfc_val, gp_val = PAPER_RESULTS[feature]['LR'][i], PAPER_RESULTS[feature]['RFC'][i], gp_avg[i]
+        gp_row_color.append('#C6EFCE' if gp_val >= max(lr_val, rfc_val) else '#FFC7CE')
+    gp_row_color.append('#E2EFDA')
+    colors.append(gp_row_color)
+    
+    table = ax.table(cellText=table_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1.2, 2)
+    
+    for i in range(len(table_data)):
+        for j in range(len(table_data[0])):
+            table[(i, j)].set_facecolor(colors[i][j])
+            if i == 0:
+                table[(i, j)].set_text_props(color='white', fontweight='bold')
+            if i == 3:
+                table[(i, j)].set_text_props(fontweight='bold')
+    
+    plt.title(f"Comparison: {feature}", fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, f"comparison_{feature}.png"), dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print(f"Saved: comparison_{feature}.png")
+
+
+def create_summary_table():
+    """Create summary comparison table for all features."""
+    fig, ax = plt.subplots(figsize=(12, 10))
+    ax.axis('off')
+    
+    summary_data = [["Feature", "LR Acc", "RFC Acc", "GP-FL Acc", "LR F1", "RFC F1", "GP-FL F1", "Winner (F1)"]]
+    
+    for feature in PAPER_RESULTS.keys():
+        if feature not in gp_fl_results:
+            continue
+        clients = gp_fl_results[feature]
+        gp_avg = [np.mean([c[i] for c in clients]) for i in range(4)]
+        lr_f1, rfc_f1, gp_f1 = PAPER_RESULTS[feature]['LR'][3], PAPER_RESULTS[feature]['RFC'][3], gp_avg[3]
+        
+        if gp_f1 >= max(lr_f1, rfc_f1):
+            winner = "GP-FL ✓"
+        elif lr_f1 >= rfc_f1:
+            winner = "LR"
+        else:
+            winner = "RFC"
+        
+        summary_data.append([feature, f"{PAPER_RESULTS[feature]['LR'][0]:.4f}", f"{PAPER_RESULTS[feature]['RFC'][0]:.4f}",
+                            f"{gp_avg[0]:.4f}", f"{lr_f1:.4f}", f"{rfc_f1:.4f}", f"{gp_f1:.4f}", winner])
+    
+    table = ax.table(cellText=summary_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 2)
+    
+    for j in range(len(summary_data[0])):
+        table[(0, j)].set_facecolor('#4472C4')
+        table[(0, j)].set_text_props(color='white', fontweight='bold')
+    
+    for i in range(1, len(summary_data)):
+        for j in range(len(summary_data[0])):
+            if j == 7 and "GP-FL" in summary_data[i][j]:
+                table[(i, j)].set_facecolor('#C6EFCE')
+                table[(i, j)].set_text_props(fontweight='bold')
+            elif j == 3 or j == 6:
+                gp_val = float(summary_data[i][j])
+                lr_val = float(summary_data[i][j-2])
+                rfc_val = float(summary_data[i][j-1])
+                if gp_val >= max(lr_val, rfc_val):
+                    table[(i, j)].set_facecolor('#C6EFCE')
+    
+    plt.title("Summary: GP-FL vs LR vs RFC (Paper Results)", fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "comparison_summary.png"), dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print("Saved: comparison_summary.png")
+
+
+def create_local_comparison_table(feature):
+    """Create local (per-cluster) comparison table."""
+    if feature not in PAPER_LOCAL_RESULTS or feature not in gp_fl_local_results:
+        return
+    
+    fig, ax = plt.subplots(figsize=(14, 8))
+    ax.axis('off')
+    
+    table_data = [["Cluster", "Model", "Accuracy", "Precision", "Recall", "F1", "Best F1?"]]
+    clusters_to_compare = list(PAPER_LOCAL_RESULTS[feature].keys())
+    
+    for cluster in clusters_to_compare:
+        paper_data = PAPER_LOCAL_RESULTS[feature][cluster]
+        
+        gp_client = None
+        if feature in CLUSTER_MAPPING:
+            for client_id, mapped_cluster in CLUSTER_MAPPING[feature].items():
+                if mapped_cluster == cluster:
+                    gp_client = client_id
+                    break
+        
+        lr_data = paper_data["LR"]
+        rfc_data = paper_data["RFC"]
+        gp_data = gp_fl_local_results[feature].get(gp_client, [0, 0, 0, 0]) if gp_client else [0, 0, 0, 0]
+        
+        f1_values = [lr_data[3], rfc_data[3], gp_data[3]]
+        best_idx = np.argmax(f1_values)
+        best_markers = ["", "", ""]
+        best_markers[best_idx] = "✓"
+        
+        cluster_label = f"Cluster {cluster}" if isinstance(cluster, int) else cluster
+        
+        table_data.append([cluster_label, "LR", f"{lr_data[0]:.4f}", f"{lr_data[1]:.4f}", 
+                          f"{lr_data[2]:.4f}", f"{lr_data[3]:.4f}", best_markers[0]])
+        table_data.append(["", "RFC", f"{rfc_data[0]:.4f}", f"{rfc_data[1]:.4f}", 
+                          f"{rfc_data[2]:.4f}", f"{rfc_data[3]:.4f}", best_markers[1]])
+        table_data.append(["", "GP-FL", f"{gp_data[0]:.4f}", f"{gp_data[1]:.4f}", 
+                          f"{gp_data[2]:.4f}", f"{gp_data[3]:.4f}", best_markers[2]])
+        table_data.append(["---", "---", "---", "---", "---", "---", "---"])
+    
+    table_data = table_data[:-1]
+    
+    table = ax.table(cellText=table_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.8)
+    
+    for j in range(len(table_data[0])):
+        table[(0, j)].set_facecolor('#4472C4')
+        table[(0, j)].set_text_props(color='white', fontweight='bold')
+    
+    for i in range(1, len(table_data)):
+        row = table_data[i]
+        if row[1] == "GP-FL":
+            for j in range(len(row)):
+                table[(i, j)].set_facecolor('#C6EFCE' if row[6] == "✓" else '#FFE6E6')
+                table[(i, j)].set_text_props(fontweight='bold')
+        elif row[0] == "---":
+            for j in range(len(row)):
+                table[(i, j)].set_facecolor('#FFFFFF')
+                table[(i, j)].set_text_props(color='#CCCCCC')
+    
+    plt.title(f"Local Model Comparison: {feature}\n(GP-FL vs Paper's LR/RFC per Cluster)", fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, f"local_comparison_{feature}.png"), dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print(f"Saved: local_comparison_{feature}.png")
+
+
+def create_local_summary_table():
+    """Create summary table for local model comparisons."""
+    fig, ax = plt.subplots(figsize=(14, 8))
+    ax.axis('off')
+    
+    summary_data = [["Feature", "Cluster", "LR F1", "RFC F1", "GP-FL F1", "Winner"]]
+    
+    for feature in ["Pregnancies", "BloodPressure", "Insulin"]:
+        if feature not in PAPER_LOCAL_RESULTS or feature not in gp_fl_local_results:
+            continue
+        for cluster, paper_data in PAPER_LOCAL_RESULTS[feature].items():
+            gp_client = [k for k, v in CLUSTER_MAPPING[feature].items() if v == cluster]
+            gp_client = gp_client[0] if gp_client else None
+            
+            lr_f1 = paper_data["LR"][3]
+            rfc_f1 = paper_data["RFC"][3]
+            gp_f1 = gp_fl_local_results[feature].get(gp_client, [0,0,0,0])[3] if gp_client else 0
+            
+            if gp_f1 >= max(lr_f1, rfc_f1):
+                winner = "GP-FL ✓"
+            elif lr_f1 >= rfc_f1:
+                winner = "LR"
+            else:
+                winner = "RFC"
+            
+            summary_data.append([feature, f"Cluster {cluster}", f"{lr_f1:.4f}", f"{rfc_f1:.4f}", f"{gp_f1:.4f}", winner])
+    
+    table = ax.table(cellText=summary_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1.2, 2)
+    
+    for j in range(len(summary_data[0])):
+        table[(0, j)].set_facecolor('#4472C4')
+        table[(0, j)].set_text_props(color='white', fontweight='bold')
+    
+    for i in range(1, len(summary_data)):
+        if "GP-FL" in summary_data[i][5]:
+            table[(i, 4)].set_facecolor('#C6EFCE')
+            table[(i, 5)].set_facecolor('#C6EFCE')
+            table[(i, 5)].set_text_props(fontweight='bold')
+    
+    plt.title("Local Model Summary: GP-FL vs LR/RFC (Per Cluster)", fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "local_comparison_summary.png"), dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print("Saved: local_comparison_summary.png")
+
+
+def generate_all_comparisons():
+    """Generate all comparison tables."""
+    print("\n📊 Generating comparison tables...")
+    
+    # Aggregated comparison tables
+    for feature in PAPER_RESULTS.keys():
+        if feature in gp_fl_results:
+            create_comparison_table(feature)
+    create_summary_table()
+    
+    # Local comparison tables
+    for feature in ["Pregnancies", "BloodPressure", "Insulin", "Glucose", "BMI"]:
+        create_local_comparison_table(feature)
+    create_local_summary_table()
+    
+    print("✅ All comparison tables generated!")
+
+
+# Main execution
+with open(output_file, "w", encoding="utf-8") as f:
+    f.write(f"Data Set: {csv_file}\n")
+    
+    for feature in features_to_test:
+        print(f"🚀 {feature} starts")
+        try:
+            result_text = run_experiment(feature)
+            f.write(result_text)
+            f.flush()
+            print(f"{feature} completed.")
+        except Exception as e:
+            print(f" Error {feature} : {e}")
+
+# Generate comparison tables
+generate_all_comparisons()

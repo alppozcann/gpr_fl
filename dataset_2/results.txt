@@ -1,0 +1,273 @@
+Data Set: dataset_2/diabetes_2.csv
+
+============================================================
+FEATURE: PREGNANCIES | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (0.0-4.0) (n=492):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8687
+  Precision   | 0.7407
+  Recall      | 0.7692
+  F1          | 0.7547
+  Roc_auc     | 0.9041
+  Threshold   | 0.4000
+----------------------------------------
+Client 2 - Cluster 1 (5.0-17.0) (n=276):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.6786
+  Precision   | 0.6774
+  Recall      | 0.7241
+  F1          | 0.7000
+  Roc_auc     | 0.7356
+  Threshold   | 0.4000
+----------------------------------------
+
+============================================================
+FEATURE: GLUCOSE | CLUSTERS: 3 | METHOD: Medical Thresholds
+============================================================
+Client 2 - Normal (70-99) (n=181):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8108
+  Precision   | 0.0000
+  Recall      | 0.0000
+  F1          | 0.0000
+  Roc_auc     | 0.6364
+  Threshold   | 0.3000
+----------------------------------------
+Client 3 - Pre-diabetes (100-125) (n=274):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7273
+  Precision   | 0.4400
+  Recall      | 0.9167
+  F1          | 0.5946
+  Roc_auc     | 0.8140
+  Threshold   | 0.3000
+----------------------------------------
+Client 4 - Diabetes (>=126) (n=297):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7167
+  Precision   | 0.8519
+  Recall      | 0.6389
+  F1          | 0.7302
+  Roc_auc     | 0.7731
+  Threshold   | 0.5500
+----------------------------------------
+
+============================================================
+FEATURE: BLOODPRESSURE | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (38.0-122.0) (n=730):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7808
+  Precision   | 0.6515
+  Recall      | 0.8269
+  F1          | 0.7288
+  Roc_auc     | 0.8699
+  Threshold   | 0.3500
+----------------------------------------
+Client 2 - Cluster 1 (0.0-30.0) (n=38):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7500
+  Precision   | 0.6667
+  Recall      | 0.6667
+  F1          | 0.6667
+  Roc_auc     | 0.6000
+  Threshold   | 0.5000
+----------------------------------------
+
+============================================================
+FEATURE: SKINTHICKNESS | CLUSTERS: 4 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (37.0-99.0) (n=131):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7778
+  Precision   | 0.7059
+  Recall      | 0.9231
+  F1          | 0.8000
+  Roc_auc     | 0.8407
+  Threshold   | 0.3500
+----------------------------------------
+Client 2 - Cluster 1 (0.0-8.0) (n=231):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7234
+  Precision   | 0.6190
+  Recall      | 0.7222
+  F1          | 0.6667
+  Roc_auc     | 0.7586
+  Threshold   | 0.4000
+----------------------------------------
+Client 3 - Cluster 2 (10.0-24.0) (n=180):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 1.0000
+  Precision   | 1.0000
+  Recall      | 1.0000
+  F1          | 1.0000
+  Roc_auc     | 1.0000
+  Threshold   | 0.3500
+----------------------------------------
+Client 4 - Cluster 3 (25.0-36.0) (n=226):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7391
+  Precision   | 0.6316
+  Recall      | 0.7059
+  F1          | 0.6667
+  Roc_auc     | 0.8174
+  Threshold   | 0.4000
+----------------------------------------
+
+============================================================
+FEATURE: INSULIN | CLUSTERS: 4 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (128.0-237.0) (n=131):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.5926
+  Precision   | 0.4737
+  Recall      | 0.9000
+  F1          | 0.6207
+  Roc_auc     | 0.8059
+  Threshold   | 0.3500
+----------------------------------------
+Client 2 - Cluster 1 (0.0-42.0) (n=395):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7342
+  Precision   | 0.6897
+  Recall      | 0.6250
+  F1          | 0.6557
+  Roc_auc     | 0.8451
+  Threshold   | 0.4000
+----------------------------------------
+Client 4 - Cluster 3 (43.0-127.0) (n=181):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8649
+  Precision   | 0.7500
+  Recall      | 0.6667
+  F1          | 0.7059
+  Roc_auc     | 0.8849
+  Threshold   | 0.3000
+----------------------------------------
+Client 5 - Cluster 4 (240.0-415.0) (n=43):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8889
+  Precision   | 0.7500
+  Recall      | 1.0000
+  F1          | 0.8571
+  Roc_auc     | 0.8889
+  Threshold   | 0.4500
+----------------------------------------
+
+============================================================
+FEATURE: BMI | CLUSTERS: 5 | METHOD: Medical Thresholds
+============================================================
+Client 2 - Healthy (18.5-24.9) (n=102):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.9048
+  Precision   | 0.6667
+  Recall      | 0.6667
+  F1          | 0.6667
+  Roc_auc     | 0.9630
+  Threshold   | 0.2500
+----------------------------------------
+Client 3 - Overweight (25-29.9) (n=179):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7778
+  Precision   | 1.0000
+  Recall      | 0.2000
+  F1          | 0.3333
+  Roc_auc     | 0.8885
+  Threshold   | 0.4000
+----------------------------------------
+Client 4 - Obesity I (30-34.9) (n=224):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7778
+  Precision   | 0.6400
+  Recall      | 0.9412
+  F1          | 0.7619
+  Roc_auc     | 0.8845
+  Threshold   | 0.4500
+----------------------------------------
+Client 5 - Obesity II (35-39.9) (n=150):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8000
+  Precision   | 0.8000
+  Recall      | 0.6667
+  F1          | 0.7273
+  Roc_auc     | 0.8426
+  Threshold   | 0.4500
+----------------------------------------
+Client 6 - Obesity III (>=40) (n=98):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.7000
+  Precision   | 0.7143
+  Recall      | 0.8333
+  F1          | 0.7692
+  Roc_auc     | 0.6667
+  Threshold   | 0.5000
+----------------------------------------
+
+============================================================
+FEATURE: DIABETESPEDIGREEFUNCTION | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (0.6-2.4) (n=194):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.6923
+  Precision   | 0.6333
+  Recall      | 0.9500
+  F1          | 0.7600
+  Roc_auc     | 0.7816
+  Threshold   | 0.3500
+----------------------------------------
+Client 2 - Cluster 1 (0.1-0.6) (n=574):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8000
+  Precision   | 0.6667
+  Recall      | 0.7895
+  F1          | 0.7229
+  Roc_auc     | 0.8742
+  Threshold   | 0.3500
+----------------------------------------
+
+============================================================
+FEATURE: AGE | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+Client 1 - Cluster 0 (21.0-37.0) (n=533):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.8505
+  Precision   | 0.6667
+  Recall      | 0.8148
+  F1          | 0.7333
+  Roc_auc     | 0.9148
+  Threshold   | 0.3500
+----------------------------------------
+Client 2 - Cluster 1 (38.0-81.0) (n=235):
+  Metric      | Value    
+  ------------|----------
+  Accuracy    | 0.6383
+  Precision   | 0.6957
+  Recall      | 0.6154
+  F1          | 0.6531
+  Roc_auc     | 0.6593
+  Threshold   | 0.5000
+----------------------------------------
