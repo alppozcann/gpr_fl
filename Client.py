@@ -4,9 +4,34 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-class GPModel(gpytorch.models.ExactGP):
+class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
-        super(GPModel, self).__init__(train_x, train_y, likelihood)
+        super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+class SparseGPModel(gpytorch.models.ApproximateGP):
+    """
+    Sparse GP using Variational Inference with inducing points.
+    Reduces complexity from O(n³) to O(nm²) where m = number of inducing points.
+    """
+    def __init__(self, inducing_points):
+        # Variational distribution over inducing points
+        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
+            inducing_points.size(0)
+        )
+        # Variational strategy
+        variational_strategy = gpytorch.variational.VariationalStrategy(
+            self, inducing_points, variational_distribution, learn_inducing_locations=True
+        )
+        super(SparseGPModel, self).__init__(variational_strategy)
+        
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
 
@@ -19,10 +44,21 @@ class GPModel(gpytorch.models.ExactGP):
 MIN_CLUSTER_SIZE = 20
 
 class Client:
-    def __init__(self, client_id, csv_path):
+    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100):
+        """
+        Initialize a GP client.
+        
+        Args:
+            client_id: Unique identifier for this client
+            csv_path: Path to the CSV data file
+            gp_type: "exact" for ExactGP or "sparse" for SparseGP with inducing points
+            num_inducing_points: Number of inducing points (only used if gp_type="sparse")
+        """
         self.id = client_id
         self.csv_path = csv_path
-        self.has_data = False # Varsayılan olarak False başlasın
+        self.has_data = False
+        self.gp_type = gp_type.lower()
+        self.num_inducing_points = num_inducing_points
 
         # 1. Veriyi Oku
         try:
@@ -65,11 +101,28 @@ class Client:
         self.test_x = self.X_tensor[train_size:]
         self.test_y = self.y_tensor[train_size:]
         
-        # Model Kurulumu
+        # Model Kurulumu - Select based on gp_type
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        self.model = GPModel(self.train_x, self.train_y, self.likelihood)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
-        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+        
+        if self.gp_type == "sparse":
+            # Sparse GP with inducing points
+            actual_num_inducing = min(self.num_inducing_points, len(self.train_x))
+            inducing_indices = torch.randperm(len(self.train_x))[:actual_num_inducing]
+            inducing_points = self.train_x[inducing_indices].clone()
+            
+            print(f"🔧 Client {self.id}: Using Sparse GP with {actual_num_inducing} inducing points")
+            
+            self.model = SparseGPModel(inducing_points)
+            self.optimizer = torch.optim.Adam([
+                {'params': self.model.parameters()},
+                {'params': self.likelihood.parameters()},
+            ], lr=0.1)
+            self.mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=len(self.train_y))
+        else:
+            # Exact GP (default)
+            self.model = ExactGPModel(self.train_x, self.train_y, self.likelihood)
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+            self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
         
         self.has_data = True
 
@@ -111,7 +164,14 @@ class Client:
         self.model.covar_module.base_kernel.lengthscale = torch.tensor([[new_length_scale]]).float()
         self.model.mean_module.constant.data = torch.tensor(new_mean_constant).float()
         
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+        # Recreate optimizer based on GP type
+        if self.gp_type == "sparse":
+            self.optimizer = torch.optim.Adam([
+                {'params': self.model.parameters()},
+                {'params': self.likelihood.parameters()},
+            ], lr=0.1)
+        else:
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
 
     def predict(self, X_test_tensor=None):
         if not self.has_data: return None, None
