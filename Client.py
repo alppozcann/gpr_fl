@@ -44,7 +44,7 @@ class SparseGPModel(gpytorch.models.ApproximateGP):
 MIN_CLUSTER_SIZE = 20
 
 class Client:
-    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100):
+    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100, expected_columns=None):
         """
         Initialize a GP client.
         
@@ -53,12 +53,14 @@ class Client:
             csv_path: Path to the CSV data file
             gp_type: "exact" for ExactGP or "sparse" for SparseGP with inducing points
             num_inducing_points: Number of inducing points (only used if gp_type="sparse")
+            expected_columns: List of expected column names after get_dummies for consistent dimensions
         """
         self.id = client_id
         self.csv_path = csv_path
         self.has_data = False
         self.gp_type = gp_type.lower()
         self.num_inducing_points = num_inducing_points
+        self.expected_columns = expected_columns
 
         # 1. Veriyi Oku
         try:
@@ -88,7 +90,17 @@ class Client:
             return
         
         scaler = StandardScaler()
-        X = pd.get_dummies(X, drop_first=True) 
+        X = pd.get_dummies(X, drop_first=True)
+        
+        # Ensure consistent columns across all clients
+        if self.expected_columns is not None:
+            # Add missing columns with zeros
+            for col in self.expected_columns:
+                if col not in X.columns:
+                    X[col] = 0
+            # Reorder and select only expected columns
+            X = X[self.expected_columns]
+        
         X_scaled = scaler.fit_transform(X)
         
         self.X_tensor = torch.tensor(X_scaled).float()

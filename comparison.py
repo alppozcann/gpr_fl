@@ -296,7 +296,7 @@ def generate_all_comparisons(gp_fl_results, gp_fl_local_results, plots_dir):
     print("✅ All comparison tables generated!")
 
 
-def generate_paper_style_table(all_results, output_file):
+def generate_paper_style_table(all_results, output_file, global_results=None):
     """
     Generate a formatted table like the paper shows.
     
@@ -304,6 +304,8 @@ def generate_paper_style_table(all_results, output_file):
         all_results: dict with structure:
             {feature: {cluster_name: {"GP-FL": [acc, prec, rec, f1], "LR": [...], "RFC": [...]}}}
         output_file: path to save the table
+        global_results: dict with structure:
+            {feature: {'accuracy': x, 'precision': x, 'recall': x, 'f1': x, ...}}
     """
     lines = []
     lines.append("=" * 100)
@@ -312,6 +314,14 @@ def generate_paper_style_table(all_results, output_file):
     
     for feature, clusters in all_results.items():
         first_feature = True
+        
+        # Add GLOBAL row first if available
+        if global_results and feature in global_results:
+            g = global_results[feature]
+            lines.append(f"{feature:<30} {'** GLOBAL **':<25} {'GP-FL':<15} {g['accuracy']:>10.4f} {g['precision']:>10.4f} {g['recall']:>10.4f} {g['f1']:>10.4f}")
+            first_feature = False
+            lines.append("-" * 100)
+        
         for cluster_name, models in clusters.items():
             first_cluster = True
             for model_name, metrics in models.items():
@@ -326,6 +336,18 @@ def generate_paper_style_table(all_results, output_file):
             lines.append("-" * 100)
     
     lines.append("=" * 100)
+    
+    # Add global summary table
+    if global_results:
+        lines.append("\n")
+        lines.append("=" * 80)
+        lines.append("GLOBAL MODEL SUMMARY (All Features)")
+        lines.append("=" * 80)
+        lines.append(f"{'Feature':<30} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1-Score':>10} {'Samples':>10}")
+        lines.append("-" * 80)
+        for feature, g in global_results.items():
+            lines.append(f"{feature:<30} {g['accuracy']:>10.4f} {g['precision']:>10.4f} {g['recall']:>10.4f} {g['f1']:>10.4f} {g['total_samples']:>10}")
+        lines.append("=" * 80)
     
     table_text = "\n".join(lines)
     
