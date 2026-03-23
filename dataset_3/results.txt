@@ -7,33 +7,33 @@ FEATURE: HIGHBP | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45944):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7587
-  Precision   | 0.3747
-  Recall      | 0.5265
-  F1          | 0.4378
-  Roc_auc     | 0.7237
+  Accuracy    | 0.7723
+  Precision   | 0.3997
+  Recall      | 0.5500
+  F1          | 0.4630
+  Roc_auc     | 0.7650
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - No High BP (n=125336):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.8545
-  Precision   | 0.2839
-  Recall      | 0.4374
-  F1          | 0.3444
-  Roc_auc     | 0.7974
-  Threshold   | 0.3000
+  Accuracy    | 0.8346
+  Precision   | 0.2658
+  Recall      | 0.5068
+  F1          | 0.3487
+  Roc_auc     | 0.7976
+  Threshold   | 0.2500
 ----------------------------------------
 Client 2 - High BP (n=104376):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6357
-  Precision   | 0.4246
-  Recall      | 0.7490
-  F1          | 0.5420
-  Roc_auc     | 0.7348
-  Threshold   | 0.1500
+  Accuracy    | 0.6597
+  Precision   | 0.4420
+  Recall      | 0.6956
+  F1          | 0.5405
+  Roc_auc     | 0.7347
+  Threshold   | 0.2000
 ----------------------------------------
 
 ============================================================
@@ -43,32 +43,32 @@ FEATURE: HIGHCHOL | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45943):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7700
-  Precision   | 0.4013
-  Recall      | 0.5865
-  F1          | 0.4765
-  Roc_auc     | 0.7776
+  Accuracy    | 0.7702
+  Precision   | 0.4028
+  Recall      | 0.5956
+  F1          | 0.4806
+  Roc_auc     | 0.7812
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - Normal Cholesterol (n=128249):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.8081
-  Precision   | 0.3068
-  Recall      | 0.6051
-  F1          | 0.4071
-  Roc_auc     | 0.8138
+  Accuracy    | 0.8099
+  Precision   | 0.3087
+  Recall      | 0.6022
+  F1          | 0.4082
+  Roc_auc     | 0.8142
   Threshold   | 0.2500
 ----------------------------------------
 Client 2 - High Cholesterol (n=101463):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6832
-  Precision   | 0.4402
-  Recall      | 0.6954
-  F1          | 0.5391
-  Roc_auc     | 0.7561
+  Accuracy    | 0.6787
+  Precision   | 0.4366
+  Recall      | 0.7089
+  F1          | 0.5404
+  Roc_auc     | 0.7565
   Threshold   | 0.2000
 ----------------------------------------
 
@@ -79,73 +79,73 @@ FEATURE: BMI | CLUSTERS: 6 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45946):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7621
-  Precision   | 0.3888
-  Recall      | 0.5876
-  F1          | 0.4680
-  Roc_auc     | 0.7685
+  Accuracy    | 0.7659
+  Precision   | 0.3956
+  Recall      | 0.5962
+  F1          | 0.4756
+  Roc_auc     | 0.7781
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - Underweight (n=3053):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.9100
-  Precision   | 0.2424
-  Recall      | 0.2105
-  F1          | 0.2254
-  Roc_auc     | 0.7076
+  Accuracy    | 0.9116
+  Precision   | 0.2333
+  Recall      | 0.1842
+  F1          | 0.2059
+  Roc_auc     | 0.7083
   Threshold   | 0.3000
 ----------------------------------------
 Client 2 - Healthy (n=58916):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7979
+  Accuracy    | 0.8001
   Precision   | 0.2246
-  Recall      | 0.5950
-  F1          | 0.3261
-  Roc_auc     | 0.7993
+  Recall      | 0.5847
+  F1          | 0.3245
+  Roc_auc     | 0.7992
   Threshold   | 0.2500
 ----------------------------------------
 Client 3 - Overweight (n=82829):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7654
-  Precision   | 0.3393
-  Recall      | 0.5669
-  F1          | 0.4245
-  Roc_auc     | 0.7759
-  Threshold   | 0.2500
+  Accuracy    | 0.7382
+  Precision   | 0.3214
+  Recall      | 0.6436
+  F1          | 0.4287
+  Roc_auc     | 0.7764
+  Threshold   | 0.2000
 ----------------------------------------
 Client 4 - Obesity I (n=50741):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7132
-  Precision   | 0.4222
-  Recall      | 0.6597
-  F1          | 0.5149
-  Roc_auc     | 0.7675
+  Accuracy    | 0.7035
+  Precision   | 0.4132
+  Recall      | 0.6781
+  F1          | 0.5135
+  Roc_auc     | 0.7670
   Threshold   | 0.2000
 ----------------------------------------
 Client 5 - Obesity II (n=20457):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6469
-  Precision   | 0.4613
-  Recall      | 0.8159
-  F1          | 0.5894
-  Roc_auc     | 0.7664
-  Threshold   | 0.1500
+  Accuracy    | 0.6694
+  Precision   | 0.4800
+  Recall      | 0.7726
+  F1          | 0.5921
+  Roc_auc     | 0.7663
+  Threshold   | 0.2000
 ----------------------------------------
 Client 6 - Obesity III (n=13716):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6928
-  Precision   | 0.5656
-  Recall      | 0.8000
-  F1          | 0.6627
-  Roc_auc     | 0.7761
-  Threshold   | 0.2000
+  Accuracy    | 0.6902
+  Precision   | 0.5611
+  Recall      | 0.8203
+  F1          | 0.6664
+  Roc_auc     | 0.7754
+  Threshold   | 0.2500
 ----------------------------------------
 
 ============================================================
@@ -155,32 +155,32 @@ FEATURE: HEARTDISEASEORATTACK | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45943):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7650
-  Precision   | 0.3974
-  Recall      | 0.6153
-  F1          | 0.4829
-  Roc_auc     | 0.7949
+  Accuracy    | 0.7688
+  Precision   | 0.4027
+  Recall      | 0.6134
+  F1          | 0.4862
+  Roc_auc     | 0.7993
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - No Heart Disease (n=206002):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7763
-  Precision   | 0.3742
-  Recall      | 0.6310
-  F1          | 0.4698
+  Accuracy    | 0.7816
+  Precision   | 0.3791
+  Recall      | 0.6132
+  F1          | 0.4685
   Roc_auc     | 0.8079
   Threshold   | 0.2500
 ----------------------------------------
 Client 2 - Heart Disease (n=23710):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.5947
-  Precision   | 0.4668
-  Recall      | 0.7990
-  F1          | 0.5893
-  Roc_auc     | 0.7083
+  Accuracy    | 0.5725
+  Precision   | 0.4529
+  Recall      | 0.8378
+  F1          | 0.5879
+  Roc_auc     | 0.7080
   Threshold   | 0.1500
 ----------------------------------------
 
@@ -191,11 +191,11 @@ FEATURE: GENHLTH | CLUSTERS: 5 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45945):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7765
-  Precision   | 0.3988
-  Recall      | 0.5881
-  F1          | 0.4753
-  Roc_auc     | 0.7935
+  Accuracy    | 0.7859
+  Precision   | 0.4149
+  Recall      | 0.5942
+  F1          | 0.4886
+  Roc_auc     | 0.8038
 ============================================================
 
 📋 PER-CLUSTER METRICS:
@@ -203,50 +203,50 @@ Client 1 - Excellent (n=34903):
   Metric      | Value    
   ------------|----------
   Accuracy    | 0.9188
-  Precision   | 0.2196
-  Recall      | 0.3388
-  F1          | 0.2665
-  Roc_auc     | 0.8129
+  Precision   | 0.2208
+  Recall      | 0.3421
+  F1          | 0.2684
+  Roc_auc     | 0.8093
   Threshold   | 0.2000
 ----------------------------------------
 Client 2 - Very Good (n=77502):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7873
-  Precision   | 0.2387
-  Recall      | 0.5533
-  F1          | 0.3335
-  Roc_auc     | 0.7708
-  Threshold   | 0.2000
+  Accuracy    | 0.7814
+  Precision   | 0.2348
+  Recall      | 0.5634
+  F1          | 0.3314
+  Roc_auc     | 0.7700
+  Threshold   | 0.1500
 ----------------------------------------
 Client 3 - Good (n=73684):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6961
-  Precision   | 0.3559
-  Recall      | 0.6334
-  F1          | 0.4557
-  Roc_auc     | 0.7461
-  Threshold   | 0.2500
+  Accuracy    | 0.6671
+  Precision   | 0.3398
+  Recall      | 0.6970
+  F1          | 0.4568
+  Roc_auc     | 0.7463
+  Threshold   | 0.2000
 ----------------------------------------
 Client 4 - Fair (n=31546):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6081
-  Precision   | 0.4624
-  Recall      | 0.7998
-  F1          | 0.5860
-  Roc_auc     | 0.7087
-  Threshold   | 0.2000
+  Accuracy    | 0.6190
+  Precision   | 0.4698
+  Recall      | 0.7683
+  F1          | 0.5831
+  Roc_auc     | 0.7088
+  Threshold   | 0.3000
 ----------------------------------------
 Client 5 - Poor (n=12077):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6469
-  Precision   | 0.5385
-  Recall      | 0.8060
-  F1          | 0.6456
-  Roc_auc     | 0.7418
+  Accuracy    | 0.6271
+  Precision   | 0.5198
+  Recall      | 0.8579
+  F1          | 0.6474
+  Roc_auc     | 0.7411
   Threshold   | 0.2000
 ----------------------------------------
 
@@ -257,33 +257,33 @@ FEATURE: PHYSHLTH | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45943):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7677
-  Precision   | 0.4008
-  Recall      | 0.6309
-  F1          | 0.4902
-  Roc_auc     | 0.7994
+  Accuracy    | 0.7691
+  Precision   | 0.4030
+  Recall      | 0.6327
+  F1          | 0.4924
+  Roc_auc     | 0.8027
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - Good (0-13 days) (n=196072):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7778
-  Precision   | 0.3712
-  Recall      | 0.6237
-  F1          | 0.4654
-  Roc_auc     | 0.8065
+  Accuracy    | 0.7821
+  Precision   | 0.3753
+  Recall      | 0.6100
+  F1          | 0.4647
+  Roc_auc     | 0.8063
   Threshold   | 0.2500
 ----------------------------------------
 Client 2 - Poor (14+ days) (n=33640):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6636
-  Precision   | 0.4679
-  Recall      | 0.7453
-  F1          | 0.5749
-  Roc_auc     | 0.7598
-  Threshold   | 0.2000
+  Accuracy    | 0.6931
+  Precision   | 0.4979
+  Recall      | 0.7000
+  F1          | 0.5819
+  Roc_auc     | 0.7595
+  Threshold   | 0.2500
 ----------------------------------------
 
 ============================================================
@@ -293,32 +293,32 @@ FEATURE: DIFFWALK | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45943):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7715
-  Precision   | 0.4050
-  Recall      | 0.6182
-  F1          | 0.4894
-  Roc_auc     | 0.8011
+  Accuracy    | 0.7705
+  Precision   | 0.4035
+  Recall      | 0.6177
+  F1          | 0.4882
+  Roc_auc     | 0.8015
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - No Difficulty Walking (n=187087):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7967
-  Precision   | 0.3548
-  Recall      | 0.5630
-  F1          | 0.4353
-  Roc_auc     | 0.8011
+  Accuracy    | 0.7962
+  Precision   | 0.3534
+  Recall      | 0.5601
+  F1          | 0.4334
+  Roc_auc     | 0.8006
   Threshold   | 0.2500
 ----------------------------------------
 Client 2 - Difficulty Walking (n=42625):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6218
-  Precision   | 0.4708
-  Recall      | 0.8089
-  F1          | 0.5952
-  Roc_auc     | 0.7377
+  Accuracy    | 0.6171
+  Precision   | 0.4675
+  Recall      | 0.8208
+  F1          | 0.5957
+  Roc_auc     | 0.7373
   Threshold   | 0.2000
 ----------------------------------------
 
@@ -329,31 +329,31 @@ FEATURE: AGE | CLUSTERS: 2 | METHOD: Medical Thresholds
 📊 GLOBAL MODEL METRICS (on all combined test data, n=45944):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.7668
-  Precision   | 0.4076
-  Recall      | 0.6331
-  F1          | 0.4959
-  Roc_auc     | 0.8047
+  Accuracy    | 0.7698
+  Precision   | 0.4053
+  Recall      | 0.5791
+  F1          | 0.4769
+  Roc_auc     | 0.7688
 ============================================================
 
 📋 PER-CLUSTER METRICS:
 Client 1 - Younger (n=89326):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.8721
-  Precision   | 0.3748
-  Recall      | 0.5106
-  F1          | 0.4323
-  Roc_auc     | 0.8369
-  Threshold   | 0.2500
+  Accuracy    | 0.8550
+  Precision   | 0.3429
+  Recall      | 0.5675
+  F1          | 0.4275
+  Roc_auc     | 0.8373
+  Threshold   | 0.3000
 ----------------------------------------
 Client 2 - Older (n=140386):
   Metric      | Value    
   ------------|----------
-  Accuracy    | 0.6999
-  Precision   | 0.4148
-  Recall      | 0.6646
-  F1          | 0.5108
-  Roc_auc     | 0.7590
-  Threshold   | 0.2500
+  Accuracy    | 0.6977
+  Precision   | 0.4132
+  Recall      | 0.6714
+  F1          | 0.5115
+  Roc_auc     | 0.7593
+  Threshold   | 0.2000
 ----------------------------------------

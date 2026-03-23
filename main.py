@@ -12,8 +12,8 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # =====================================================
 # CONFIGURATION
 # =====================================================
-DATASET_NUMBER = 2
-GP_TYPE = "exact"  # sparse or exact
+DATASET_NUMBER = 3
+GP_TYPE = "sparse"  # sparse or exact
 NUM_INDUCING_POINTS = 100
 
 # DON'T CHANGE THESE SETTINGS
