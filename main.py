@@ -12,11 +12,11 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # =====================================================
 # CONFIGURATION
 # =====================================================
-DATASET_NUMBER = 3
-GP_TYPE = "sparse"  # sparse or exact
+DATASET_NUMBER = 2
+GP_TYPE = "exact"        # "sparse" or "exact"
 NUM_INDUCING_POINTS = 100
+KERNEL_TYPE = "rbf"  # "rbf", "matern", "rbf_ard", "matern_ard" (recommended)
 
-# DON'T CHANGE THESE SETTINGS
 NUM_FL_ROUNDS = 3
 LOCAL_EPOCHS_PER_ROUND = 20
 DATASET = f"dataset_{DATASET_NUMBER}/"
@@ -89,8 +89,9 @@ def run_experiment(feature_name):
         temp_csv = f"temp_cluster_{i}.csv"
         cluster_df.to_csv(temp_csv, index=False)
         
-        client = Client(client_id=i+1, csv_path=temp_csv, gp_type=GP_TYPE, 
-                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns)
+        client = Client(client_id=i+1, csv_path=temp_csv, gp_type=GP_TYPE,
+                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns,
+                       kernel_type=KERNEL_TYPE)
         if client.has_data:
             clients.append(client)
             client_sizes.append(len(client.train_x))
@@ -102,17 +103,19 @@ def run_experiment(feature_name):
                 os.remove(f"temp_cluster_{i}.csv")
         return f"\n{feature_name}: Not enough valid clients (need >= 2)\n"
     
-    # Federated Learning
-    client_updates = []
-    for client in clients:
-        client.train_local(training_iter=50)
-        params = client.send_params()
-        if params is not None:
-            client_updates.append(params)
-    
-    global_params = weighted_average_aggregation(client_updates, client_sizes)
-    for client in clients:
-        client.set_params(global_params)
+    # Federated Learning — NUM_FL_ROUNDS rounds
+    for fl_round in range(NUM_FL_ROUNDS):
+        print(f"\n--- FL Round {fl_round + 1}/{NUM_FL_ROUNDS} ({feature_name}) ---")
+        client_updates = []
+        for client in clients:
+            client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND)
+            params = client.send_params()
+            if params is not None:
+                client_updates.append(params)
+
+        global_params = weighted_average_aggregation(client_updates, client_sizes)
+        for client in clients:
+            client.set_params(global_params)
     
     # Cleanup temp files
     for i in range(num_clusters):
