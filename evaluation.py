@@ -34,16 +34,16 @@ def get_global_metrics(clients, threshold=None):
         # Get predictions on test data
         with torch.no_grad():
             pred_dist = client.likelihood(client.model(client.test_x))
-            y_pred_probs = pred_dist.mean.cpu().numpy().flatten()
-        
+            y_pred_probs = pred_dist.probs.cpu().numpy().flatten()
+
         y_true = client.test_y.cpu().numpy().flatten().astype(int)
         all_y_true.append(y_true)
         all_y_probs.append(y_pred_probs)
-        
+
         # Get predictions on training data for threshold optimization
         with torch.no_grad():
             train_dist = client.likelihood(client.model(client.train_x))
-            train_probs = train_dist.mean.cpu().numpy().flatten()
+            train_probs = train_dist.probs.cpu().numpy().flatten()
         
         train_y = client.train_y.cpu().numpy().flatten().astype(int)
         all_train_y.append(train_y)

@@ -27,23 +27,18 @@ def build_kernel(kernel_type, num_features):
     return gpytorch.kernels.ScaleKernel(base)
 
 
-class ExactGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood, kernel):
-        super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = kernel
-
-    def forward(self, x):
-        mean_x = self.mean_module(x)
-        covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+def _choose_num_inducing(train_size):
+    if train_size < 1000:
+        return min(100, train_size)
+    elif train_size < 50000:
+        return min(300, train_size)
+    else:
+        return min(500, train_size)
 
 
-class SparseGPModel(gpytorch.models.ApproximateGP):
-    """
-    Sparse GP using Variational Inference with inducing points.
-    Reduces complexity from O(n³) to O(nm²) where m = number of inducing points.
-    """
+class SVGPClassificationModel(gpytorch.models.ApproximateGP):
+    """SVGP with BernoulliLikelihood for binary classification."""
+
     def __init__(self, inducing_points, kernel):
         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             inducing_points.size(0)
@@ -51,7 +46,7 @@ class SparseGPModel(gpytorch.models.ApproximateGP):
         variational_strategy = gpytorch.variational.VariationalStrategy(
             self, inducing_points, variational_distribution, learn_inducing_locations=True
         )
-        super(SparseGPModel, self).__init__(variational_strategy)
+        super().__init__(variational_strategy)
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = kernel
 
@@ -65,25 +60,23 @@ MIN_CLUSTER_SIZE = 20
 
 
 class Client:
-    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100,
+    def __init__(self, client_id, csv_path, gp_type="sparse", num_inducing_points=None,
                  expected_columns=None, kernel_type="matern_ard"):
         """
-        Initialize a GP client.
+        Initialize a GP classification client (always SVGP + BernoulliLikelihood).
 
         Args:
             client_id: Unique identifier for this client
             csv_path: Path to the CSV data file
-            gp_type: "exact" for ExactGP or "sparse" for SparseGP with inducing points
-            num_inducing_points: Number of inducing points (only used if gp_type="sparse")
+            gp_type: Ignored — always uses SVGP classification
+            num_inducing_points: Override inducing point count; auto-scaled by dataset size if None
             expected_columns: List of expected column names after get_dummies for consistent dimensions
             kernel_type: "rbf", "matern", "rbf_ard", or "matern_ard" (default: "matern_ard")
         """
         self.id = client_id
         self.csv_path = csv_path
         self.has_data = False
-        self.gp_type = gp_type.lower()
         self.kernel_type = kernel_type.lower()
-        self.num_inducing_points = num_inducing_points
         self.expected_columns = expected_columns
 
         try:
@@ -128,29 +121,30 @@ class Client:
         self.test_y = torch.tensor(y.values[train_size:]).float()
         self.num_features = self.train_x.shape[1]
 
-        # Build kernel
+        device = self.train_x.device
+
+        n_ip = num_inducing_points if num_inducing_points is not None else _choose_num_inducing(train_size)
+        n_ip = min(n_ip, train_size)
+
+        inducing_indices = torch.randperm(train_size)[:n_ip]
+        inducing_points = self.train_x[inducing_indices].clone().to(device)
+
         kernel = build_kernel(self.kernel_type, self.num_features)
+        self.model = SVGPClassificationModel(inducing_points, kernel)
+        self.likelihood = gpytorch.likelihoods.BernoulliLikelihood()
 
-        self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        print(f"🔧 Client {self.id}: SVGP Classification | {n_ip} inducing pts | kernel={self.kernel_type}")
 
-        if self.gp_type == "sparse":
-            actual_num_inducing = min(self.num_inducing_points, len(self.train_x))
-            inducing_indices = torch.randperm(len(self.train_x))[:actual_num_inducing]
-            inducing_points = self.train_x[inducing_indices].clone()
-
-            print(f"🔧 Client {self.id}: Sparse GP | {actual_num_inducing} inducing pts | kernel={self.kernel_type}")
-
-            self.model = SparseGPModel(inducing_points, kernel)
-            self.optimizer = torch.optim.Adam([
-                {'params': self.model.parameters()},
-                {'params': self.likelihood.parameters()},
-            ], lr=0.1)
-            self.mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=len(self.train_y))
-        else:
-            print(f"🔧 Client {self.id}: Exact GP | kernel={self.kernel_type}")
-            self.model = ExactGPModel(self.train_x, self.train_y, self.likelihood, kernel)
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
-            self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+        self.optimizer = torch.optim.Adam(
+            list(self.model.parameters()) + list(self.likelihood.parameters()),
+            lr=0.01
+        )
+        self.scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, step_size=50, gamma=0.5
+        )
+        self.mll = gpytorch.mlls.VariationalELBO(
+            self.likelihood, self.model, num_data=train_size
+        )
 
         self.has_data = True
 
@@ -169,6 +163,7 @@ class Client:
             loss = -self.mll(output, self.train_y)
             loss.backward()
             self.optimizer.step()
+            self.scheduler.step()
 
             if torch.isnan(loss):
                 print(f"⚠️ Client {self.id}: Loss NaN, stopping early.")
@@ -177,41 +172,42 @@ class Client:
     def send_params(self):
         """
         Serialize kernel hyperparameters for federated aggregation.
-        Format: [log(output_scale), log(ls_1), ..., log(ls_d), mean_constant]
-        Works for both single-lengthscale and ARD kernels.
+        Format: [log(output_scale), log(ls_1), ..., log(ls_d)]
+        BernoulliLikelihood has no learnable parameters to aggregate.
         """
         if not self.has_data:
             return None
         output_scale = self.model.covar_module.outputscale.item()
         ls = self.model.covar_module.base_kernel.lengthscale.detach().cpu().numpy().flatten()
-        mean_constant = self.model.mean_module.constant.item()
-        return np.concatenate([[np.log(output_scale)], np.log(ls), [mean_constant]])
+        return np.concatenate([[np.log(output_scale)], np.log(ls)])
 
     def set_params(self, params):
         """
         Deserialize and apply aggregated kernel hyperparameters.
-        Format: [log(output_scale), log(ls_1..d), mean_constant]
+        Format: [log(output_scale), log(ls_1..d)]
         """
         if not self.has_data:
             return
         new_output_scale = float(np.exp(params[0]))
-        mean_constant = float(params[-1])
-        new_ls = np.exp(params[1:-1])
+        new_ls = np.exp(params[1:])
 
         self.model.covar_module.outputscale = torch.tensor(new_output_scale).float()
-        ls_tensor = torch.tensor(new_ls, dtype=torch.float32).unsqueeze(0)  # shape [1, d]
+        ls_tensor = torch.tensor(new_ls, dtype=torch.float32).unsqueeze(0)
         self.model.covar_module.base_kernel.lengthscale = ls_tensor
-        self.model.mean_module.constant.data = torch.tensor(mean_constant).float()
 
-        if self.gp_type == "sparse":
-            self.optimizer = torch.optim.Adam([
-                {'params': self.model.parameters()},
-                {'params': self.likelihood.parameters()},
-            ], lr=0.1)
-        else:
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+        self.optimizer = torch.optim.Adam(
+            list(self.model.parameters()) + list(self.likelihood.parameters()),
+            lr=0.01
+        )
+        self.scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, step_size=50, gamma=0.5
+        )
 
     def predict(self, X_test_tensor=None):
+        """
+        Returns (probs, hard_labels) where probs are class-1 probabilities in [0,1]
+        and hard_labels are {0,1} thresholded at 0.5.
+        """
         if not self.has_data:
             return None, None
 
@@ -222,33 +218,18 @@ class Client:
         self.likelihood.eval()
 
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            observed_pred = self.likelihood(self.model(X_test_tensor))
-            y_pred = observed_pred.mean.detach().cpu().numpy()
-            y_var = observed_pred.variance.detach().cpu().numpy()
+            pred_dist = self.likelihood(self.model(X_test_tensor))
+            y_probs = pred_dist.probs.detach().cpu().numpy()
+            y_hard = (y_probs > 0.5).astype(float)
 
-        return y_pred, y_var
+        return y_probs, y_hard
 
     def get_learner(self):
         return self
-
-    def test_global_model(self):
-        mu, _ = self.predict()
-
-        if torch.is_tensor(self.test_y):
-            y_test_numpy = self.test_y.cpu().numpy()
-        else:
-            y_test_numpy = self.test_y
-
-        mu = mu.flatten()
-        y_test_numpy = y_test_numpy.flatten()
-        mse = np.mean((mu - y_test_numpy) ** 2)
-        print(f"Client {self.id} Test MSE: {mse:.5f}")
-        return mse
 
     def get_params(self):
         if not self.has_data:
             return None
         output_scale = self.model.covar_module.outputscale.item()
         length_scale = self.model.covar_module.base_kernel.lengthscale.detach().cpu().numpy().flatten()
-        mean_constant = self.model.mean_module.constant.item()
-        return output_scale, length_scale, mean_constant
+        return output_scale, length_scale

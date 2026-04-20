@@ -31,8 +31,9 @@ def get_uncertainty_metrics(client):
     with torch.no_grad():
         # Get predictions on test data
         pred_dist = client.likelihood(client.model(client.test_x))
-        y_pred_mean = pred_dist.mean.cpu().numpy().flatten()
-        y_pred_var = pred_dist.variance.cpu().numpy().flatten()
+        y_pred_mean = pred_dist.probs.cpu().numpy().flatten()
+        # Bernoulli variance: p*(1-p)
+        y_pred_var = (y_pred_mean * (1 - y_pred_mean))
         y_pred_std = np.sqrt(y_pred_var)
     
     y_true = client.test_y.cpu().numpy().flatten().astype(int)

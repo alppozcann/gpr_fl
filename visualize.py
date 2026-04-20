@@ -22,11 +22,13 @@ def find_optimal_threshold(client):
     return best_threshold
 
 def plot_gp_predictions(client, feature_name, output_dir):
-    y_pred, y_var = client.predict()
+    y_pred, _ = client.predict()
     y_true = client.test_y.cpu().numpy().flatten()
     optimal_thresh = find_optimal_threshold(client)
-    
-    std = np.sqrt(y_var.flatten())
+
+    # Bernoulli aleatoric uncertainty: sqrt(p*(1-p))
+    p = y_pred.flatten()
+    std = np.sqrt(p * (1 - p))
     x_axis = np.arange(len(y_true))
     
     plt.figure(figsize=(10, 5))

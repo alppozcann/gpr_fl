@@ -13,9 +13,9 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # CONFIGURATION
 # =====================================================
 DATASET_NUMBER = 2
-GP_TYPE = "exact"        # "sparse" or "exact"
-NUM_INDUCING_POINTS = 100
-KERNEL_TYPE = "rbf"  # "rbf", "matern", "rbf_ard", "matern_ard" (recommended)
+GP_TYPE = "sparse"       # kept for API compatibility — always uses SVGP classification
+NUM_INDUCING_POINTS = None  # None = auto-scale (100/300/500 by dataset size); or set an int to override
+KERNEL_TYPE = "matern"   # "rbf", "matern", "rbf_ard", "matern_ard"
 
 NUM_FL_ROUNDS = 3
 LOCAL_EPOCHS_PER_ROUND = 20
