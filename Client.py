@@ -160,7 +160,16 @@ class Client:
         for i in range(training_iter):
             self.optimizer.zero_grad()
             output = self.model(self.train_x)
-            loss = -self.mll(output, self.train_y)
+
+            pos = (self.train_y == 1).sum().float()
+            neg = (self.train_y == 0).sum().float()
+            pos_weight = (neg / pos).clamp(min=1.0, max=20.0)
+
+            mll_val = self.mll(output, self.train_y)
+            sample_weights = torch.where(self.train_y == 1, pos_weight, torch.ones_like(self.train_y))
+            sample_weights = sample_weights / sample_weights.mean()
+            loss = -(mll_val * sample_weights.mean())
+
             loss.backward()
             self.optimizer.step()
             self.scheduler.step()

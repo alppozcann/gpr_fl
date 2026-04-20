@@ -15,14 +15,14 @@ GP provides UNCERTAINTY estimates, enabling:
 ====================================================================================================
 Feature                   Coverage     Acc (All)    Acc (Conf)   F1 (All)     F1 (Conf)    Uncertain % 
 ====================================================================================================
-HighBP                    100.0        0.8273       0.8273       0.1103       0.1103       52.3        
-HighChol                  100.0        0.8291       0.8291       0.1495       0.1495       52.8        
-BMI                       100.0        0.8271       0.8271       0.1197       0.1197       54.0        
-HeartDiseaseorAttack      89.7         0.8283       0.8483       0.2132       0.2299       56.4        
-GenHlth                   100.0        0.8302       0.8302       0.0460       0.0460       51.1        
-PhysHlth                  100.0        0.8296       0.8296       0.1539       0.1539       54.6        
-DiffWalk                  100.0        0.8269       0.8269       0.0928       0.0928       55.0        
-Age                       100.0        0.8279       0.8279       0.2189       0.2189       54.6        
+HighBP                    100.0        0.8216       0.8216       0.0000       0.0000       50.0        
+HighChol                  100.0        0.8215       0.8215       0.0000       0.0000       50.0        
+BMI                       100.0        0.8224       0.8224       0.0176       0.0176       50.0        
+HeartDiseaseorAttack      100.0        0.8221       0.8221       0.0140       0.0140       50.0        
+GenHlth                   100.0        0.8291       0.8291       0.0354       0.0354       50.0        
+PhysHlth                  100.0        0.8230       0.8230       0.0010       0.0010       50.0        
+DiffWalk                  100.0        0.8234       0.8234       0.0143       0.0143       50.0        
+Age                       100.0        0.8188       0.8188       0.0000       0.0000       50.0        
 ====================================================================================================
 
 
@@ -31,71 +31,99 @@ FEATURE: HighBP
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3413
-  Median σ: 0.2787
-  σ for correct predictions: 0.3330
-  σ for incorrect predictions: 0.3810
+  Mean σ: 0.4029
+  Median σ: 0.4415
+  σ for correct predictions: 0.3932
+  σ for incorrect predictions: 0.4477
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 21916 (47.7%)
-    → Actual diabetes rate: 6.8%
-  Uncertain (Needs Review): 24028 (52.3%)
-    → Actual diabetes rate: 27.9%
+  Low Risk (Confident Healthy): 22972 (50.0%)
+    → Actual diabetes rate: 8.5%
+  Uncertain (Needs Review): 22972 (50.0%)
+    → Actual diabetes rate: 27.1%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8273       0.6824       0.0600       0.1103      
-  10           54.6         0.9128       0.7778       0.0032       0.0064      
-  20           54.6         0.9128       0.7778       0.0032       0.0064      
-  30           54.6         0.9128       0.7778       0.0032       0.0064      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8216       0.0000       0.0000       0.0000      
+  10           55.2         0.9088       0.0000       0.0000       0.0000      
+  20           33.5         0.9314       0.0000       0.0000       0.0000      
+  30           22.4         0.9484       0.0000       0.0000       0.0000      
+  40           14.5         0.9597       0.0000       0.0000       0.0000      
+  50           8.7          0.9676       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: HighChol
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3468
-  Median σ: 0.3014
-  σ for correct predictions: 0.3421
-  σ for incorrect predictions: 0.3696
+  Mean σ: 0.3980
+  Median σ: 0.4366
+  σ for correct predictions: 0.3882
+  σ for incorrect predictions: 0.4430
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 21670 (47.2%)
-    → Actual diabetes rate: 8.3%
-  Uncertain (Needs Review): 24273 (52.8%)
-    → Actual diabetes rate: 26.4%
+  Low Risk (Confident Healthy): 22971 (50.0%)
+    → Actual diabetes rate: 8.9%
+  Uncertain (Needs Review): 22972 (50.0%)
+    → Actual diabetes rate: 26.8%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8291       0.6680       0.0841       0.1495      
-  10           55.8         0.8913       0.6667       0.0043       0.0085      
-  20           55.8         0.8913       0.6667       0.0043       0.0085      
-  30           0.0          0.0000       0.0000       0.0000       0.0000      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8215       0.0000       0.0000       0.0000      
+  10           58.7         0.9017       0.0000       0.0000       0.0000      
+  20           35.5         0.9292       0.0000       0.0000       0.0000      
+  30           23.9         0.9479       0.0000       0.0000       0.0000      
+  40           15.6         0.9598       0.0000       0.0000       0.0000      
+  50           9.4          0.9690       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: BMI
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3451
-  Median σ: 0.3373
-  σ for correct predictions: 0.3398
-  σ for incorrect predictions: 0.3707
+  Mean σ: 0.4114
+  Median σ: 0.4442
+  σ for correct predictions: 0.4034
+  σ for incorrect predictions: 0.4483
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 21125 (46.0%)
-    → Actual diabetes rate: 8.1%
-  Uncertain (Needs Review): 24821 (54.0%)
+  Low Risk (Confident Healthy): 22973 (50.0%)
+    → Actual diabetes rate: 9.3%
+  Uncertain (Needs Review): 22973 (50.0%)
+    → Actual diabetes rate: 26.3%
+  High Risk (Confident Diabetic): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.8224       0.5840       0.0089       0.0176      
+  10           54.6         0.9029       0.0000       0.0000       0.0000      
+  20           29.9         0.9312       0.0000       0.0000       0.0000      
+  30           18.2         0.9484       0.0000       0.0000       0.0000      
+  40           10.7         0.9615       0.0000       0.0000       0.0000      
+  50           5.8          0.9690       0.0000       0.0000       0.0000      
+
+================================================================================
+FEATURE: HeartDiseaseorAttack
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.4032
+  Median σ: 0.4365
+  σ for correct predictions: 0.3946
+  σ for incorrect predictions: 0.4430
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 22971 (50.0%)
+    → Actual diabetes rate: 9.6%
+  Uncertain (Needs Review): 22972 (50.0%)
     → Actual diabetes rate: 26.1%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
@@ -103,152 +131,124 @@ Risk Stratification:
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8271       0.6421       0.0660       0.1197      
-  10           83.3         0.8534       0.5764       0.0439       0.0816      
-  20           63.0         0.8783       0.5328       0.0184       0.0356      
-  30           27.0         0.9188       0.0000       0.0000       0.0000      
-  40           1.3          0.9378       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
-
-================================================================================
-FEATURE: HeartDiseaseorAttack
-================================================================================
-
-Uncertainty Statistics:
-  Mean σ: 0.3429
-  Median σ: 0.3306
-  σ for correct predictions: 0.3403
-  σ for incorrect predictions: 0.3556
-
-Risk Stratification:
-  Low Risk (Confident Healthy): 20049 (43.6%)
-    → Actual diabetes rate: 8.7%
-  Uncertain (Needs Review): 25892 (56.4%)
-    → Actual diabetes rate: 24.9%
-  High Risk (Confident Diabetic): 2 (0.0%)
-    → Actual diabetes rate: 0.0%
-
-Confidence Filtering Analysis:
-  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
-  ------------------------------------------------------------------------
-  0            100.0        0.8283       0.5838       0.1304       0.2132      
-  10           89.7         0.8483       0.5665       0.1442       0.2299      
-  20           89.7         0.8483       0.5665       0.1442       0.2299      
-  30           0.0          0.0000       0.0000       0.0000       0.0000      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8221       0.6105       0.0071       0.0140      
+  10           60.2         0.8909       0.0000       0.0000       0.0000      
+  20           33.2         0.9277       0.0000       0.0000       0.0000      
+  30           20.9         0.9485       0.0000       0.0000       0.0000      
+  40           13.1         0.9622       0.0000       0.0000       0.0000      
+  50           7.6          0.9671       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: GenHlth
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3399
-  Median σ: 0.3836
-  σ for correct predictions: 0.3302
-  σ for incorrect predictions: 0.3873
+  Mean σ: 0.4034
+  Median σ: 0.4402
+  σ for correct predictions: 0.3944
+  σ for incorrect predictions: 0.4474
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 22462 (48.9%)
-    → Actual diabetes rate: 7.6%
-  Uncertain (Needs Review): 23483 (51.1%)
-    → Actual diabetes rate: 26.4%
+  Low Risk (Confident Healthy): 22972 (50.0%)
+    → Actual diabetes rate: 9.1%
+  Uncertain (Needs Review): 22973 (50.0%)
+    → Actual diabetes rate: 25.3%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8302       0.6989       0.0238       0.0460      
-  10           81.0         0.8724       0.5745       0.0057       0.0112      
-  20           48.9         0.9202       0.0000       0.0000       0.0000      
-  30           48.9         0.9202       0.0000       0.0000       0.0000      
-  40           15.2         0.9565       0.0000       0.0000       0.0000      
-  50           15.2         0.9565       0.0000       0.0000       0.0000      
+  0            100.0        0.8291       0.6234       0.0182       0.0354      
+  10           57.2         0.9021       0.0000       0.0000       0.0000      
+  20           33.4         0.9293       0.0000       0.0000       0.0000      
+  30           22.0         0.9468       0.0000       0.0000       0.0000      
+  40           14.3         0.9586       0.0000       0.0000       0.0000      
+  50           8.6          0.9695       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: PhysHlth
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3524
-  Median σ: 0.3382
-  σ for correct predictions: 0.3505
-  σ for incorrect predictions: 0.3618
+  Mean σ: 0.4099
+  Median σ: 0.4406
+  σ for correct predictions: 0.4027
+  σ for incorrect predictions: 0.4429
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 20878 (45.4%)
-    → Actual diabetes rate: 9.6%
-  Uncertain (Needs Review): 25065 (54.6%)
-    → Actual diabetes rate: 24.5%
+  Low Risk (Confident Healthy): 22971 (50.0%)
+    → Actual diabetes rate: 10.1%
+  Uncertain (Needs Review): 22972 (50.0%)
+    → Actual diabetes rate: 25.3%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8296       0.6357       0.0875       0.1539      
-  10           85.4         0.8481       0.5902       0.0656       0.1181      
-  20           85.4         0.8481       0.5902       0.0656       0.1181      
-  30           0.0          0.0000       0.0000       0.0000       0.0000      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8230       0.5714       0.0005       0.0010      
+  10           58.2         0.8898       0.0000       0.0000       0.0000      
+  20           29.9         0.9292       0.0000       0.0000       0.0000      
+  30           17.7         0.9492       0.0000       0.0000       0.0000      
+  40           10.3         0.9618       0.0000       0.0000       0.0000      
+  50           5.3          0.9685       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: DiffWalk
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3479
-  Median σ: 0.3258
-  σ for correct predictions: 0.3437
-  σ for incorrect predictions: 0.3681
+  Mean σ: 0.4069
+  Median σ: 0.4387
+  σ for correct predictions: 0.3986
+  σ for incorrect predictions: 0.4458
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 20667 (45.0%)
-    → Actual diabetes rate: 9.1%
-  Uncertain (Needs Review): 25276 (55.0%)
-    → Actual diabetes rate: 24.8%
+  Low Risk (Confident Healthy): 22971 (50.0%)
+    → Actual diabetes rate: 9.8%
+  Uncertain (Needs Review): 22972 (50.0%)
+    → Actual diabetes rate: 25.6%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8269       0.6460       0.0500       0.0928      
-  10           81.4         0.8620       0.5753       0.0330       0.0625      
-  20           81.4         0.8620       0.5753       0.0330       0.0625      
-  30           0.0          0.0000       0.0000       0.0000       0.0000      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8234       0.6344       0.0072       0.0143      
+  10           58.7         0.8916       0.0000       0.0000       0.0000      
+  20           32.0         0.9291       0.0000       0.0000       0.0000      
+  30           19.9         0.9489       0.0000       0.0000       0.0000      
+  40           12.2         0.9611       0.0000       0.0000       0.0000      
+  50           6.7          0.9683       0.0000       0.0000       0.0000      
 
 ================================================================================
 FEATURE: Age
 ================================================================================
 
 Uncertainty Statistics:
-  Mean σ: 0.3484
-  Median σ: 0.3900
-  σ for correct predictions: 0.3442
-  σ for incorrect predictions: 0.3687
+  Mean σ: 0.4022
+  Median σ: 0.4395
+  σ for correct predictions: 0.3934
+  σ for incorrect predictions: 0.4419
 
 Risk Stratification:
-  Low Risk (Confident Healthy): 20842 (45.4%)
-    → Actual diabetes rate: 8.0%
-  Uncertain (Needs Review): 25102 (54.6%)
-    → Actual diabetes rate: 26.5%
+  Low Risk (Confident Healthy): 22972 (50.0%)
+    → Actual diabetes rate: 9.3%
+  Uncertain (Needs Review): 22972 (50.0%)
+    → Actual diabetes rate: 27.0%
   High Risk (Confident Diabetic): 0 (0.0%)
     → Actual diabetes rate: 0.0%
 
 Confidence Filtering Analysis:
   Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
   ------------------------------------------------------------------------
-  0            100.0        0.8279       0.6156       0.1331       0.2189      
-  10           38.9         0.9068       0.7262       0.0358       0.0682      
-  20           38.9         0.9068       0.7262       0.0358       0.0682      
-  30           1.6          0.9597       0.0000       0.0000       0.0000      
-  40           0.0          0.0000       0.0000       0.0000       0.0000      
-  50           0.0          0.0000       0.0000       0.0000       0.0000      
+  0            100.0        0.8188       0.0000       0.0000       0.0000      
+  10           53.2         0.9045       0.0000       0.0000       0.0000      
+  20           31.2         0.9342       0.0000       0.0000       0.0000      
+  30           20.1         0.9514       0.0000       0.0000       0.0000      
+  40           12.7         0.9612       0.0000       0.0000       0.0000      
+  50           7.6          0.9725       0.0000       0.0000       0.0000      
 
 ====================================================================================================
 CONCLUSION:

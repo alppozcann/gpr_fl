@@ -4,3 +4,4 @@ myenv/
 __pycache__
 .vscode
 */plots/
+*.md
