@@ -206,7 +206,7 @@ class Client:
     def predict(self, X_test_tensor=None):
         """
         Returns (probs, hard_labels) where probs are class-1 probabilities in [0,1]
-        and hard_labels are {0,1} thresholded at 0.5.
+        and hard_labels are {0,1} thresholded at fixed 0.5.
         """
         if not self.has_data:
             return None, None
@@ -220,7 +220,8 @@ class Client:
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             pred_dist = self.likelihood(self.model(X_test_tensor))
             y_probs = pred_dist.probs.detach().cpu().numpy()
-            y_hard = (y_probs > 0.5).astype(float)
+            threshold = 0.5
+            y_hard = (y_probs > threshold).astype(float)
 
         return y_probs, y_hard
 

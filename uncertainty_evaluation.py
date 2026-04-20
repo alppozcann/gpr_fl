@@ -37,12 +37,16 @@ def get_uncertainty_metrics(client):
         y_pred_std = np.sqrt(y_pred_var)
     
     y_true = client.test_y.cpu().numpy().flatten().astype(int)
+    threshold = 0.5
+    y_pred_binary = (y_pred_mean > threshold).astype(int)
     
     return {
         'y_true': y_true,
         'y_pred_mean': y_pred_mean,
         'y_pred_var': y_pred_var,
-        'y_pred_std': y_pred_std
+        'y_pred_std': y_pred_std,
+        'y_pred_binary': y_pred_binary,
+        'threshold': threshold
     }
 
 
@@ -58,16 +62,21 @@ def analyze_uncertainty(clients, feature_name, plots_dir):
     all_y_true = []
     all_y_pred_mean = []
     all_y_pred_std = []
+    all_y_pred_binary = []
+    all_thresholds = []
     
     for client in clients:
         metrics = get_uncertainty_metrics(client)
         all_y_true.append(metrics['y_true'])
         all_y_pred_mean.append(metrics['y_pred_mean'])
         all_y_pred_std.append(metrics['y_pred_std'])
+        all_y_pred_binary.append(metrics['y_pred_binary'])
+        all_thresholds.append(metrics['threshold'])
     
     y_true = np.concatenate(all_y_true)
     y_pred_mean = np.concatenate(all_y_pred_mean)
     y_pred_std = np.concatenate(all_y_pred_std)
+    y_pred_binary = np.concatenate(all_y_pred_binary)
     
     results = {}
     
@@ -78,7 +87,6 @@ def analyze_uncertainty(clients, feature_name, plots_dir):
     results['min_uncertainty'] = np.min(y_pred_std)
     
     # 2. Uncertainty by prediction correctness
-    y_pred_binary = (y_pred_mean > 0.5).astype(int)
     correct_mask = (y_pred_binary == y_true)
     
     results['mean_uncertainty_correct'] = np.mean(y_pred_std[correct_mask])
@@ -102,7 +110,7 @@ def analyze_uncertainty(clients, feature_name, plots_dir):
         
         if np.sum(confident_mask) > 0:
             y_true_conf = y_true[confident_mask]
-            y_pred_conf = (y_pred_mean[confident_mask] > 0.5).astype(int)
+            y_pred_conf = y_pred_binary[confident_mask]
             
             acc = accuracy_score(y_true_conf, y_pred_conf)
             prec = precision_score(y_true_conf, y_pred_conf, zero_division=0)
@@ -153,12 +161,13 @@ def analyze_uncertainty(clients, feature_name, plots_dir):
     }
     
     # Generate visualizations
-    _create_uncertainty_plots(y_true, y_pred_mean, y_pred_std, feature_name, plots_dir, results)
+    decision_threshold = float(np.mean(all_thresholds)) if len(all_thresholds) > 0 else 0.5
+    _create_uncertainty_plots(y_true, y_pred_mean, y_pred_std, y_pred_binary, decision_threshold, feature_name, plots_dir, results)
     
     return results
 
 
-def _create_uncertainty_plots(y_true, y_pred_mean, y_pred_std, feature_name, plots_dir, results):
+def _create_uncertainty_plots(y_true, y_pred_mean, y_pred_std, y_pred_binary, decision_threshold, feature_name, plots_dir, results):
     """Create uncertainty visualization plots."""
     
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -171,11 +180,12 @@ def _create_uncertainty_plots(y_true, y_pred_mean, y_pred_std, feature_name, plo
     ax1.set_xlabel('Predicted Probability')
     ax1.set_ylabel('Prediction Uncertainty (Std)')
     ax1.set_title('Prediction vs Uncertainty\n(Green=Healthy, Red=Diabetic)')
-    ax1.axvline(x=0.5, color='black', linestyle='--', alpha=0.5)
+    ax1.axvline(x=decision_threshold, color='black', linestyle='--', alpha=0.5,
+                label=f'Decision threshold ({decision_threshold:.2f})')
+    ax1.legend()
     
     # 2. Uncertainty distribution by correctness
     ax2 = axes[0, 1]
-    y_pred_binary = (y_pred_mean > 0.5).astype(int)
     correct_mask = (y_pred_binary == y_true)
     ax2.hist(y_pred_std[correct_mask], bins=50, alpha=0.7, label=f'Correct (μ={results["mean_uncertainty_correct"]:.3f})', color='green')
     ax2.hist(y_pred_std[~correct_mask], bins=50, alpha=0.7, label=f'Incorrect (μ={results["mean_uncertainty_incorrect"]:.3f})', color='red')
@@ -388,22 +398,23 @@ def get_global_uncertainty_metrics(clients, threshold=None):
     all_y_true = []
     all_y_probs = []
     all_y_std = []
+    all_y_binary = []
     
     for client in clients:
         metrics = get_uncertainty_metrics(client)
         all_y_true.append(metrics['y_true'])
         all_y_probs.append(metrics['y_pred_mean'])
         all_y_std.append(metrics['y_pred_std'])
+        if threshold is None:
+            all_y_binary.append(metrics['y_pred_binary'])
+        else:
+            all_y_binary.append((metrics['y_pred_mean'] > threshold).astype(int))
     
     y_true = np.concatenate(all_y_true)
     y_pred_probs = np.concatenate(all_y_probs)
     y_pred_std = np.concatenate(all_y_std)
     
-    # Standard metrics
-    if threshold is None:
-        threshold = 0.5
-    
-    y_pred_binary = (y_pred_probs > threshold).astype(int)
+    y_pred_binary = np.concatenate(all_y_binary)
     
     accuracy = accuracy_score(y_true, y_pred_binary)
     precision = precision_score(y_true, y_pred_binary, zero_division=0)

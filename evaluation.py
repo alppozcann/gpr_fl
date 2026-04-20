@@ -23,8 +23,7 @@ def get_global_metrics(clients, threshold=None):
     """
     all_y_true = []
     all_y_probs = []
-    all_train_y = []
-    all_train_probs = []
+    thresholds_used = []
     
     # Each client predicts on its own data
     for client in clients:
@@ -37,29 +36,23 @@ def get_global_metrics(clients, threshold=None):
             y_pred_probs = pred_dist.probs.cpu().numpy().flatten()
 
         y_true = client.test_y.cpu().numpy().flatten().astype(int)
+
+        if threshold is None:
+            client_threshold = 0.5
+        else:
+            client_threshold = threshold
+        y_pred_binary = (y_pred_probs > client_threshold).astype(int)
+
         all_y_true.append(y_true)
         all_y_probs.append(y_pred_probs)
-
-        # Get predictions on training data for threshold optimization
-        with torch.no_grad():
-            train_dist = client.likelihood(client.model(client.train_x))
-            train_probs = train_dist.probs.cpu().numpy().flatten()
-        
-        train_y = client.train_y.cpu().numpy().flatten().astype(int)
-        all_train_y.append(train_y)
-        all_train_probs.append(train_probs)
+        thresholds_used.append(client_threshold)
     
     # Concatenate all results
     y_true = np.concatenate(all_y_true)
     y_pred_probs = np.concatenate(all_y_probs)
-    
-    # Find optimal threshold if not provided
-    if threshold is None:
-        train_y = np.concatenate(all_train_y)
-        train_probs = np.concatenate(all_train_probs)
-        threshold = find_optimal_threshold(train_y, train_probs)
-    
-    y_pred_binary = (y_pred_probs > threshold).astype(int)
+    y_pred_binary = np.concatenate([
+        (all_y_probs[i] > thresholds_used[i]).astype(int) for i in range(len(all_y_probs))
+    ])
     
     accuracy = accuracy_score(y_true, y_pred_binary)
     precision = precision_score(y_true, y_pred_binary, zero_division=0)
@@ -77,24 +70,17 @@ def get_global_metrics(clients, threshold=None):
         "recall": recall,
         "f1": f1,
         "roc_auc": roc_auc,
-        "threshold": threshold,
+        "threshold": float(np.mean(thresholds_used)) if len(thresholds_used) > 0 else 0.5,
+        "thresholds_used": thresholds_used,
         "total_samples": len(y_true)
     }
 
 
 def find_optimal_threshold(y_true, y_probs):
-    best_threshold = 0.5
-    best_f1 = 0
-    for threshold in np.arange(0.1, 0.9, 0.05):
-        y_pred = (y_probs > threshold).astype(int)
-        f1 = f1_score(y_true, y_pred, zero_division=0)
-        if f1 > best_f1:
-            best_f1 = f1
-            best_threshold = threshold
-    return best_threshold
+    return 0.5
 
 def get_metrics(client, threshold=None):
-    y_pred_probs, _ = client.predict()
+    y_pred_probs, y_pred_hard = client.predict()
     y_true = client.test_y
     
     if torch.is_tensor(y_true):
@@ -103,11 +89,7 @@ def get_metrics(client, threshold=None):
     if torch.is_tensor(y_pred_probs):
         y_pred_probs = y_pred_probs.cpu().numpy().flatten()
     
-    if threshold is None:
-        train_probs, _ = client.predict(client.train_x)
-        train_y = client.train_y.cpu().numpy().flatten().astype(int)
-        threshold = find_optimal_threshold(train_y, train_probs.flatten())
-        
+    threshold = 0.5
     y_pred_binary = (y_pred_probs > threshold).astype(int)
     
     accuracy = accuracy_score(y_true, y_pred_binary)
