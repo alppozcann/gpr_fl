@@ -1,5 +1,6 @@
 import torch
 import gpytorch
+from gpytorch.optim import NGD
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -40,7 +41,7 @@ class SVGPClassificationModel(gpytorch.models.ApproximateGP):
     """SVGP with BernoulliLikelihood for binary classification."""
 
     def __init__(self, inducing_points, kernel):
-        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
+        variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
             inducing_points.size(0)
         )
         variational_strategy = gpytorch.variational.VariationalStrategy(
@@ -103,6 +104,8 @@ class Client:
             print(f"⚠️ Client {self.id}: Veri sayısı çok az ({len(df)} < {MIN_CLUSTER_SIZE}), atlanıyor.")
             return
 
+        from sklearn.model_selection import train_test_split
+
         scaler = StandardScaler()
         X = pd.get_dummies(X, drop_first=True)
 
@@ -113,20 +116,60 @@ class Client:
             X = X[self.expected_columns]
 
         X_scaled = scaler.fit_transform(X)
+        y_arr = y.values
 
-        train_size = int(0.8 * len(X_scaled))
-        self.train_x = torch.tensor(X_scaled[:train_size]).float()
-        self.train_y = torch.tensor(y.values[:train_size]).float()
-        self.test_x = torch.tensor(X_scaled[train_size:]).float()
-        self.test_y = torch.tensor(y.values[train_size:]).float()
+        # Stratified split so both halves have positives
+        try:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_scaled, y_arr, test_size=0.2, stratify=y_arr, random_state=42
+            )
+        except ValueError:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_scaled, y_arr, test_size=0.2, random_state=42
+            )
+
+        # Balance train: oversample minority class
+        pos_idx = np.where(y_train == 1)[0]
+        neg_idx = np.where(y_train == 0)[0]
+        if len(pos_idx) > 0 and len(pos_idx) < len(neg_idx):
+            rng = np.random.default_rng(42)
+            extra = rng.choice(pos_idx, size=len(neg_idx) - len(pos_idx), replace=True)
+            aug_idx = np.concatenate([np.arange(len(y_train)), extra])
+            rng.shuffle(aug_idx)
+            X_train = X_train[aug_idx]
+            y_train = y_train[aug_idx]
+
+        # Balance test: undersample majority class
+        pos_test = np.where(y_test == 1)[0]
+        neg_test = np.where(y_test == 0)[0]
+        if len(pos_test) > 0 and len(neg_test) > len(pos_test):
+            rng2 = np.random.default_rng(42)
+            neg_keep = rng2.choice(neg_test, size=len(pos_test), replace=False)
+            keep_idx = np.concatenate([pos_test, neg_keep])
+            rng2.shuffle(keep_idx)
+            X_test = X_test[keep_idx]
+            y_test = y_test[keep_idx]
+
+        self.train_x = torch.tensor(X_train).float()
+        self.train_y = torch.tensor(y_train).float()
+        self.test_x = torch.tensor(X_test).float()
+        self.test_y = torch.tensor(y_test).float()
         self.num_features = self.train_x.shape[1]
+        train_size = len(X_train)
 
         device = self.train_x.device
 
         n_ip = num_inducing_points if num_inducing_points is not None else _choose_num_inducing(train_size)
         n_ip = min(n_ip, train_size)
 
-        inducing_indices = torch.randperm(train_size)[:n_ip]
+        # Stratified inducing points: 50% from positives, 50% from negatives
+        pos_ip_pool = (self.train_y == 1).nonzero(as_tuple=True)[0]
+        neg_ip_pool = (self.train_y == 0).nonzero(as_tuple=True)[0]
+        n_pos_ip = min(n_ip // 2, len(pos_ip_pool))
+        n_neg_ip = min(n_ip - n_pos_ip, len(neg_ip_pool))
+        pos_ip_idx = pos_ip_pool[torch.randperm(len(pos_ip_pool))[:n_pos_ip]]
+        neg_ip_idx = neg_ip_pool[torch.randperm(len(neg_ip_pool))[:n_neg_ip]]
+        inducing_indices = torch.cat([pos_ip_idx, neg_ip_idx])
         inducing_points = self.train_x[inducing_indices].clone().to(device)
 
         kernel = build_kernel(self.kernel_type, self.num_features)
@@ -135,82 +178,88 @@ class Client:
 
         print(f"🔧 Client {self.id}: SVGP Classification | {n_ip} inducing pts | kernel={self.kernel_type}")
 
-        self.optimizer = torch.optim.Adam(
-            list(self.model.parameters()) + list(self.likelihood.parameters()),
-            lr=0.01
+        # NGD for variational parameters (mean/covariance in natural space)
+        # Adam for kernel hyperparameters, likelihood, and inducing locations
+        self.variational_optimizer = NGD(
+            self.model.variational_parameters(), num_data=train_size, lr=0.1
         )
-        self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=50, gamma=0.5
-        )
+        self.hyperparameter_optimizer = torch.optim.Adam([
+            {'params': self.model.hyperparameters()},
+            {'params': self.likelihood.parameters()},
+        ], lr=0.01)
         self.mll = gpytorch.mlls.VariationalELBO(
             self.likelihood, self.model, num_data=train_size
         )
 
         self.has_data = True
 
-    def train_local(self, training_iter=50):
+    def train_local(self, training_iter=50, batch_size=256):
         if not self.has_data:
             return
 
         self.model.train()
         self.likelihood.train()
 
-        print(f"Client {self.id} training... (n={len(self.train_x)}, iters={training_iter})")
+        n = len(self.train_x)
+        effective_batch = min(batch_size, n)
+        dataset = torch.utils.data.TensorDataset(self.train_x, self.train_y)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=effective_batch, shuffle=True)
 
-        for i in range(training_iter):
-            self.optimizer.zero_grad()
-            output = self.model(self.train_x)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.hyperparameter_optimizer, T_max=training_iter, eta_min=1e-4
+        )
 
-            pos = (self.train_y == 1).sum().float()
-            neg = (self.train_y == 0).sum().float()
-            pos_weight = (neg / pos).clamp(min=1.0, max=20.0)
+        print(f"Client {self.id} training... (n={n}, epochs={training_iter}, batch={effective_batch})")
 
-            mll_val = self.mll(output, self.train_y)
-            sample_weights = torch.where(self.train_y == 1, pos_weight, torch.ones_like(self.train_y))
-            sample_weights = sample_weights / sample_weights.mean()
-            loss = -(mll_val * sample_weights.mean())
+        with gpytorch.settings.cholesky_jitter(1e-3):
+            for epoch in range(training_iter):
+                for x_batch, y_batch in loader:
+                    self.variational_optimizer.zero_grad()
+                    self.hyperparameter_optimizer.zero_grad()
+                    output = self.model(x_batch)
+                    loss = -self.mll(output, y_batch)
+                    loss.backward()
+                    self.variational_optimizer.step()
+                    self.hyperparameter_optimizer.step()
 
-            loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
+                    if torch.isnan(loss):
+                        print(f"⚠️ Client {self.id}: Loss NaN at epoch {epoch}, stopping early.")
+                        return
 
-            if torch.isnan(loss):
-                print(f"⚠️ Client {self.id}: Loss NaN, stopping early.")
-                break
+                scheduler.step()
 
     def send_params(self):
         """
         Serialize kernel hyperparameters for federated aggregation.
-        Format: [log(output_scale), log(ls_1), ..., log(ls_d)]
-        BernoulliLikelihood has no learnable parameters to aggregate.
+        Format: [log(output_scale), log(ls_1), ..., log(ls_d), mean_constant]
         """
         if not self.has_data:
             return None
         output_scale = self.model.covar_module.outputscale.item()
         ls = self.model.covar_module.base_kernel.lengthscale.detach().cpu().numpy().flatten()
-        return np.concatenate([[np.log(output_scale)], np.log(ls)])
+        mean_const = self.model.mean_module.constant.item()
+        return np.concatenate([[np.log(output_scale)], np.log(ls), [mean_const]])
 
     def set_params(self, params):
         """
         Deserialize and apply aggregated kernel hyperparameters.
-        Format: [log(output_scale), log(ls_1..d)]
+        Format: [log(output_scale), log(ls_1..d), mean_constant]
+        Preserves Adam momentum buffers across FL rounds for faster convergence.
         """
         if not self.has_data:
             return
         new_output_scale = float(np.exp(params[0]))
-        new_ls = np.exp(params[1:])
+        new_ls = np.exp(params[1:-1])
+        new_mean = float(params[-1])
 
         self.model.covar_module.outputscale = torch.tensor(new_output_scale).float()
         ls_tensor = torch.tensor(new_ls, dtype=torch.float32).unsqueeze(0)
         self.model.covar_module.base_kernel.lengthscale = ls_tensor
+        self.model.mean_module.constant.data.fill_(new_mean)
 
-        self.optimizer = torch.optim.Adam(
-            list(self.model.parameters()) + list(self.likelihood.parameters()),
-            lr=0.01
-        )
-        self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=50, gamma=0.5
-        )
+        # Reset LR to initial value but keep Adam momentum for warm-starting
+        for pg in self.hyperparameter_optimizer.param_groups:
+            pg['lr'] = 0.01
 
     def predict(self, X_test_tensor=None):
         """
@@ -226,7 +275,7 @@ class Client:
         self.model.eval()
         self.likelihood.eval()
 
-        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        with torch.no_grad(), gpytorch.settings.fast_pred_var(), gpytorch.settings.cholesky_jitter(1e-3):
             pred_dist = self.likelihood(self.model(X_test_tensor))
             y_probs = pred_dist.probs.detach().cpu().numpy()
             threshold = 0.5

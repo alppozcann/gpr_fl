@@ -13,12 +13,41 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # CONFIGURATION
 # =====================================================
 DATASET_NUMBER = 3
-GP_TYPE = "sparse"       # kept for API compatibility — always uses SVGP classification
-NUM_INDUCING_POINTS = 1000  # None = auto-scale (100/300/500 by dataset size); or set an int to override
-KERNEL_TYPE = "matern"   # "rbf", "matern", "rbf_ard", "matern_ard"
 
-NUM_FL_ROUNDS = 3
-LOCAL_EPOCHS_PER_ROUND = 20
+DATASET_CONFIGS = {
+    # Dataset 1: 100k rows, medical features (HbA1c, glucose, BMI, age)
+    1: {
+        "NUM_INDUCING_POINTS": 500,
+        "KERNEL_TYPE": "matern",
+        "NUM_FL_ROUNDS": 5,
+        "LOCAL_EPOCHS_PER_ROUND": 50,
+        "BATCH_SIZE": 512,
+    },
+    # Dataset 2: 769 rows (Pima Indians) — small clusters, more rounds for better consensus
+    2: {
+        "NUM_INDUCING_POINTS": 75,
+        "KERNEL_TYPE": "matern",
+        "NUM_FL_ROUNDS": 7,
+        "LOCAL_EPOCHS_PER_ROUND": 80,
+        "BATCH_SIZE": 32,
+    },
+    # Dataset 3: 229k rows (BRFSS survey) — large clusters, large batches
+    3: {
+        "NUM_INDUCING_POINTS": 1000,
+        "KERNEL_TYPE": "matern",
+        "NUM_FL_ROUNDS": 5,
+        "LOCAL_EPOCHS_PER_ROUND": 30,
+        "BATCH_SIZE": 512,
+    },
+}
+
+_cfg = DATASET_CONFIGS[DATASET_NUMBER]
+GP_TYPE = "sparse"       # kept for API compatibility — always uses SVGP classification
+NUM_INDUCING_POINTS = _cfg["NUM_INDUCING_POINTS"]
+KERNEL_TYPE         = _cfg["KERNEL_TYPE"]
+NUM_FL_ROUNDS       = _cfg["NUM_FL_ROUNDS"]
+LOCAL_EPOCHS_PER_ROUND = _cfg["LOCAL_EPOCHS_PER_ROUND"]
+BATCH_SIZE          = _cfg["BATCH_SIZE"]
 DATASET = f"dataset_{DATASET_NUMBER}/"
 DATA_TABLE = f"diabetes_{DATASET_NUMBER}.csv"
 csv_file = os.path.join(DATASET, DATA_TABLE)
@@ -108,7 +137,7 @@ def run_experiment(feature_name):
         print(f"\n--- FL Round {fl_round + 1}/{NUM_FL_ROUNDS} ({feature_name}) ---")
         client_updates = []
         for client in clients:
-            client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND)
+            client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND, batch_size=BATCH_SIZE)
             params = client.send_params()
             if params is not None:
                 client_updates.append(params)
