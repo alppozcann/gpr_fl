@@ -1,5 +1,3 @@
-import torch
-import gpytorch
 import numpy as np
 import warnings
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
@@ -11,41 +9,25 @@ def get_global_metrics(clients, threshold=None):
     """
     Compute global metrics by having each client predict on its OWN test data,
     then concatenating all predictions for unified metrics.
-    
-    This is the correct approach for clustered FL where each client's model
-    is specialized for its cluster's data distribution.
-    
+
+    Uses client.predict() (returns probs, hard_labels) and client.optimal_threshold
+    (learned on validation set) instead of accessing model internals directly.
+
     Args:
         clients: List of Client objects
-        threshold: Optional threshold for binary classification
-        
-    Returns:
-        dict with global accuracy, precision, recall, f1, roc_auc
+        threshold: Optional override threshold; if None uses each client's optimal_threshold
     """
     all_y_true = []
     all_y_probs = []
     thresholds_used = []
-    
-    # Each client predicts on its own data
+
     for client in clients:
-        client.model.eval()
-        client.likelihood.eval()
-
-        with torch.no_grad(), gpytorch.settings.cholesky_jitter(1e-3):
-            pred_dist = client.likelihood(client.model(client.test_x))
-            y_pred_probs = pred_dist.probs.cpu().numpy().flatten()
-
-            if threshold is None:
-                train_dist = client.likelihood(client.model(client.train_x))
-                train_probs = train_dist.probs.cpu().numpy().flatten()
-                train_true = client.train_y.cpu().numpy().flatten().astype(int)
-                client_threshold = find_optimal_threshold(train_true, train_probs)
-            else:
-                client_threshold = threshold
-
+        probs, _ = client.predict()  # (probs, hard_labels) on client.test_x
         y_true = client.test_y.cpu().numpy().flatten().astype(int)
+        client_threshold = threshold if threshold is not None else client.optimal_threshold
+
         all_y_true.append(y_true)
-        all_y_probs.append(y_pred_probs)
+        all_y_probs.append(np.array(probs).flatten())
         thresholds_used.append(client_threshold)
     
     # Concatenate all results
@@ -87,19 +69,13 @@ def find_optimal_threshold(y_true, y_probs):
     return float(best_t)
 
 def get_metrics(client, threshold=None):
-    y_pred_probs, _ = client.predict()
+    y_pred_probs, _ = client.predict()  # probs = sigmoid(f(x)) on client.test_x
     y_true = client.test_y.cpu().numpy().flatten().astype(int)
     y_pred_probs = np.array(y_pred_probs).flatten()
 
+    # Use the threshold already optimised on the validation set; allow explicit override
     if threshold is None:
-        # Find optimal threshold on training data to avoid overfitting to test set
-        client.model.eval()
-        client.likelihood.eval()
-        with torch.no_grad(), gpytorch.settings.cholesky_jitter(1e-3):
-            train_dist = client.likelihood(client.model(client.train_x))
-            train_probs = train_dist.probs.cpu().numpy().flatten()
-        train_true = client.train_y.cpu().numpy().flatten().astype(int)
-        threshold = find_optimal_threshold(train_true, train_probs)
+        threshold = client.optimal_threshold
 
     y_pred_binary = (y_pred_probs > threshold).astype(int)
 

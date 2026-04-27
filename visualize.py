@@ -8,27 +8,27 @@ import os
 warnings.filterwarnings("ignore", message="The input matches the stored training data")
 
 def get_partition_threshold(client):
-    return 0.5
+    return client.optimal_threshold
 
 def plot_gp_predictions(client, feature_name, output_dir):
-    y_pred, _ = client.predict()
+    probs, _ = client.predict()  # probs = sigmoid(f(x)) on client.test_x
     y_true = client.test_y.cpu().numpy().flatten()
     partition_thresh = get_partition_threshold(client)
 
     # Bernoulli aleatoric uncertainty: sqrt(p*(1-p))
-    p = y_pred.flatten()
+    p = np.array(probs).flatten()
     std = np.sqrt(p * (1 - p))
     x_axis = np.arange(len(y_true))
-    
+
     plt.figure(figsize=(10, 5))
-    
-    plt.fill_between(x_axis, y_pred.flatten() - 2*std, y_pred.flatten() + 2*std, 
+
+    plt.fill_between(x_axis, p - 2*std, p + 2*std,
                      alpha=0.3, color='gray', label='95% Confidence')
-    
+
     plt.scatter(x_axis, y_true, c='gray', alpha=0.6, s=30, label='Actual')
-    
-    plt.plot(x_axis, y_pred.flatten(), 'b-', linewidth=2, label='GP Prediction')
-    
+
+    plt.plot(x_axis, p, 'b-', linewidth=2, label='GP Prediction')
+
     plt.axhline(y=partition_thresh, color='r', linestyle='--', alpha=0.7, label=f'Partition Threshold ({partition_thresh:.2f})')
     
     plt.xlabel('Sample Index')
@@ -44,11 +44,11 @@ def plot_gp_predictions(client, feature_name, output_dir):
     print(f"Saved: {filename}")
 
 def plot_confusion_matrix(client, feature_name, output_dir):
-    y_pred_probs, _ = client.predict()
+    y_pred_probs, _ = client.predict()  # probs = sigmoid(f(x)) on client.test_x
     y_true = client.test_y.cpu().numpy().flatten().astype(int)
     partition_thresh = get_partition_threshold(client)
-    
-    y_pred = (y_pred_probs.flatten() > partition_thresh).astype(int)
+
+    y_pred = (np.array(y_pred_probs).flatten() > partition_thresh).astype(int)
     
     cm = confusion_matrix(y_true, y_pred)
     

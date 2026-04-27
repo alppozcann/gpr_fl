@@ -11,7 +11,6 @@ For medical diagnosis, this is crucial:
 - Uncertain → Needs further testing (GP flags these!)
 """
 
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -21,25 +20,25 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 def get_uncertainty_metrics(client):
     """
     Get predictions with uncertainty from a single client.
-    
+
+    Uses client.predict() — returns (probs, hard_labels) — so no direct
+    model access is needed. Aleatoric uncertainty is approximated as
+    Bernoulli variance: p*(1-p), consistent with sigmoid(f(x)) output.
+
     Returns:
         dict with predictions, uncertainties, and metrics
     """
-    client.model.eval()
-    client.likelihood.eval()
-    
-    with torch.no_grad():
-        # Get predictions on test data
-        pred_dist = client.likelihood(client.model(client.test_x))
-        y_pred_mean = pred_dist.probs.cpu().numpy().flatten()
-        # Bernoulli variance: p*(1-p)
-        y_pred_var = (y_pred_mean * (1 - y_pred_mean))
-        y_pred_std = np.sqrt(y_pred_var)
-    
+    probs, _ = client.predict()  # probs = sigmoid(f(x)) on client.test_x
+    y_pred_mean = np.array(probs).flatten()
+
+    # Bernoulli aleatoric uncertainty: p*(1-p)
+    y_pred_var = y_pred_mean * (1 - y_pred_mean)
+    y_pred_std = np.sqrt(y_pred_var)
+
     y_true = client.test_y.cpu().numpy().flatten().astype(int)
-    threshold = 0.5
+    threshold = client.optimal_threshold
     y_pred_binary = (y_pred_mean > threshold).astype(int)
-    
+
     return {
         'y_true': y_true,
         'y_pred_mean': y_pred_mean,

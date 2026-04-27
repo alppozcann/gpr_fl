@@ -12,15 +12,15 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # =====================================================
 # CONFIGURATION
 # =====================================================
-DATASET_NUMBER = 3
+DATASET_NUMBER = 1
 
 DATASET_CONFIGS = {
     # Dataset 1: 100k rows, medical features (HbA1c, glucose, BMI, age)
     1: {
-        "NUM_INDUCING_POINTS": 500,
+        "NUM_INDUCING_POINTS": 1000,  # 500→1000: better coverage of 100k-row clusters
         "KERNEL_TYPE": "matern",
-        "NUM_FL_ROUNDS": 5,
-        "LOCAL_EPOCHS_PER_ROUND": 50,
+        "NUM_FL_ROUNDS": 8,           # 5→8: more federation consensus rounds
+        "LOCAL_EPOCHS_PER_ROUND": 80, # 50→80: longer local convergence per round
         "BATCH_SIZE": 512,
     },
     # Dataset 2: 769 rows (Pima Indians) — small clusters, more rounds for better consensus
@@ -119,8 +119,7 @@ def run_experiment(feature_name):
         cluster_df.to_csv(temp_csv, index=False)
         
         client = Client(client_id=i+1, csv_path=temp_csv, gp_type=GP_TYPE,
-                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns,
-                       kernel_type=KERNEL_TYPE)
+                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns)
         if client.has_data:
             clients.append(client)
             client_sizes.append(len(client.train_x))
@@ -133,17 +132,34 @@ def run_experiment(feature_name):
         return f"\n{feature_name}: Not enough valid clients (need >= 2)\n"
     
     # Federated Learning — NUM_FL_ROUNDS rounds
+    MIN_POS_RATIO = 0.10  # clients below this threshold are excluded from aggregation
+
     for fl_round in range(NUM_FL_ROUNDS):
         print(f"\n--- FL Round {fl_round + 1}/{NUM_FL_ROUNDS} ({feature_name}) ---")
         client_updates = []
-        for client in clients:
-            client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND, batch_size=BATCH_SIZE)
+        contributing_sizes = []
+
+        for client, size in zip(clients, client_sizes):
+            iters = max(LOCAL_EPOCHS_PER_ROUND, 100 if len(client.train_x) > 50000 else 50)
+            client.train_local(training_iter=iters)
+
+            pos_ratio = client.train_y.mean().item()
+            if pos_ratio < MIN_POS_RATIO:
+                print(f"  [SKIP] Client {client.id} excluded from {feature_name} FL: "
+                      f"pos_ratio={pos_ratio:.3f} < threshold={MIN_POS_RATIO}")
+                continue
+
             params = client.send_params()
             if params is not None:
                 client_updates.append(params)
+                contributing_sizes.append(size)
 
-        global_params = weighted_average_aggregation(client_updates, client_sizes)
-        for client in clients:
+        if len(client_updates) == 0:
+            print(f"  ⚠️ No clients contributed to round {fl_round + 1} — skipping aggregation.")
+            continue
+
+        global_params = weighted_average_aggregation(client_updates, contributing_sizes)
+        for client in clients:  # ALL clients receive global params (including excluded ones)
             client.set_params(global_params)
     
     # Cleanup temp files
@@ -156,23 +172,28 @@ def run_experiment(feature_name):
               f"FEATURE: {feature_name.upper()} | CLUSTERS: {len(clients)} | METHOD: {clustering_method}\n",
               f"{'='*60}\n"]
     
-    # Global metrics (NEW)
+    _PRIMARY_METRICS = ['f1', 'roc_auc', 'accuracy', 'precision', 'recall']
+    _METRIC_LABELS   = {'f1': 'F1-Score', 'roc_auc': 'ROC-AUC',
+                        'accuracy': 'Accuracy', 'precision': 'Precision', 'recall': 'Recall'}
+
+    # Global metrics
     global_m = get_global_metrics(clients)
     report.append(f"\n📊 GLOBAL MODEL METRICS (on all combined test data, n={global_m['total_samples']}):\n")
     report.append(f"  Metric      | Value    \n  ------------|----------\n")
-    for key in ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']:
-        report.append(f"  {key.capitalize():<11} | {global_m[key]:.4f}\n")
+    for key in _PRIMARY_METRICS:
+        report.append(f"  {_METRIC_LABELS[key]:<11} | {global_m[key]:.4f}\n")
     report.append(f"{'='*60}\n")
-    
+
     # Per-cluster metrics
     report.append(f"\n📋 PER-CLUSTER METRICS:\n")
     for client in clients:
         m = get_metrics(client)
         cluster_label = valid_cluster_names.get(client.id, f"Cluster {client.id}")
-        report.append(f"Client {client.id} - {cluster_label} (n={len(client.train_x)+len(client.test_x)}):\n")
+        n_total = len(client.train_x) + len(client.val_x) + len(client.test_x)
+        report.append(f"Client {client.id} - {cluster_label} (n={n_total}):\n")
         report.append(f"  Metric      | Value    \n  ------------|----------\n")
-        for key in m.keys():
-            report.append(f"  {key.capitalize():<11} | {m[key]:.4f}\n")
+        for key in _PRIMARY_METRICS:
+            report.append(f"  {_METRIC_LABELS[key]:<11} | {m[key]:.4f}\n")
         report.append(f"{'-'*40}\n")
     
     visualize_clients(clients, feature_name, plots_dir)
@@ -195,9 +216,11 @@ def run_experiment(feature_name):
     for client in clients:
         m = get_metrics(client)
         cluster_label = valid_cluster_names.get(client.id, f"Cluster {client.id}")
-        gp_fl_results[feature_name].append([m['accuracy'], m['precision'], m['recall'], m['f1']])
-        gp_fl_local_results[feature_name][client.id] = [m['accuracy'], m['precision'], m['recall'], m['f1']]
-        all_results_for_table[feature_name][cluster_label] = {"GP-FL": [m['accuracy'], m['precision'], m['recall'], m['f1']]}
+        # [acc, prec, rec, f1] order kept for comparison.py baseline tables (LR/RFC use same format)
+        _row = [m['accuracy'], m['precision'], m['recall'], m['f1']]
+        gp_fl_results[feature_name].append(_row)
+        gp_fl_local_results[feature_name][client.id] = _row
+        all_results_for_table[feature_name][cluster_label] = {"GP-FL": _row}
     
     # Uncertainty analysis (GP's unique power!)
     uncertainty_results = analyze_uncertainty(clients, feature_name, plots_dir)

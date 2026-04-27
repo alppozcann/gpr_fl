@@ -1,55 +1,54 @@
 import torch
 import gpytorch
-from gpytorch.optim import NGD
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score, confusion_matrix
 
 
-def build_kernel(kernel_type, num_features):
+class SmallDatasetGPModel(gpytorch.models.ExactGP):
     """
-    Build a GPyTorch kernel.
+    ExactGP + GaussianLikelihood for small datasets (n < 2000).
 
-    kernel_type options:
-        "rbf"        - RBF, single lengthscale
-        "matern"     - Matérn 5/2, single lengthscale
-        "rbf_ard"    - RBF, one lengthscale per feature (ARD)
-        "matern_ard" - Matérn 5/2, one lengthscale per feature (ARD) [default]
+    Training: ExactMarginalLogLikelihood on {-1,+1} targets (signed GP surrogate).
+    Inference: Laplace probit approximation — P(y=1|x*) ≈ σ(μ* / √(1 + π/8·σ²*))
+               from Rasmussen & Williams (2006) §3.4.3, eq. 3.82.
     """
-    kt = kernel_type.lower()
-    if kt == "rbf":
-        base = gpytorch.kernels.RBFKernel()
-    elif kt == "matern":
-        base = gpytorch.kernels.MaternKernel(nu=2.5)
-    elif kt == "rbf_ard":
-        base = gpytorch.kernels.RBFKernel(ard_num_dims=num_features)
-    else:  # matern_ard
-        base = gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=num_features)
-    return gpytorch.kernels.ScaleKernel(base)
+    def __init__(self, train_x, train_y, likelihood):
+        super().__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        # Constrain lengthscale to [0.1, 3.0] — prevents over-smoothing that collapses probs to 0.5
+        self.covar_module.base_kernel.register_constraint(
+            "raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0)
+        )
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-def _choose_num_inducing(train_size):
-    if train_size < 1000:
-        return min(100, train_size)
-    elif train_size < 50000:
-        return min(300, train_size)
-    else:
-        return min(500, train_size)
-
-
-class SVGPClassificationModel(gpytorch.models.ApproximateGP):
-    """SVGP with BernoulliLikelihood for binary classification."""
-
-    def __init__(self, inducing_points, kernel):
-        variational_distribution = gpytorch.variational.NaturalVariationalDistribution(
+class SparseGPModel(gpytorch.models.ApproximateGP):
+    """
+    Sparse GP using Variational Inference with inducing points.
+    Reduces complexity from O(n³) to O(nm²) where m = number of inducing points.
+    """
+    def __init__(self, inducing_points):
+        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             inducing_points.size(0)
         )
         variational_strategy = gpytorch.variational.VariationalStrategy(
             self, inducing_points, variational_distribution, learn_inducing_locations=True
         )
-        super().__init__(variational_strategy)
+        super(SparseGPModel, self).__init__(variational_strategy)
+
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = kernel
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        # Constrain lengthscale to [0.1, 3.0] — prevents over-smoothing that collapses probs to 0.5
+        self.covar_module.base_kernel.register_constraint(
+            "raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0)
+        )
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -58,27 +57,18 @@ class SVGPClassificationModel(gpytorch.models.ApproximateGP):
 
 
 MIN_CLUSTER_SIZE = 20
+MIN_POSITIVE_SAMPLES = 30  # absolute minimum positives — below this no meaningful boundary exists
 
 
 class Client:
-    def __init__(self, client_id, csv_path, gp_type="sparse", num_inducing_points=None,
-                 expected_columns=None, kernel_type="matern_ard"):
-        """
-        Initialize a GP classification client (always SVGP + BernoulliLikelihood).
-
-        Args:
-            client_id: Unique identifier for this client
-            csv_path: Path to the CSV data file
-            gp_type: Ignored — always uses SVGP classification
-            num_inducing_points: Override inducing point count; auto-scaled by dataset size if None
-            expected_columns: List of expected column names after get_dummies for consistent dimensions
-            kernel_type: "rbf", "matern", "rbf_ard", or "matern_ard" (default: "matern_ard")
-        """
+    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100, expected_columns=None):
         self.id = client_id
         self.csv_path = csv_path
         self.has_data = False
-        self.kernel_type = kernel_type.lower()
+        self.gp_type = gp_type.lower()
+        self.num_inducing_points = num_inducing_points
         self.expected_columns = expected_columns
+        self.optimal_threshold = 0.5  # Validation'da öğrenilecek
 
         try:
             df = pd.read_csv(csv_path)
@@ -100,13 +90,21 @@ class Client:
         y = df["diabetes"]
         X = df.drop(columns=["diabetes"])
 
+        pos_rate = y.mean()
+        print(f"  [Client {self.id}] class dağılımı: "
+              f"pozitif={pos_rate:.1%}  negatif={(1-pos_rate):.1%}  (n={len(y)})")
+
         if len(df) < MIN_CLUSTER_SIZE:
             print(f"⚠️ Client {self.id}: Veri sayısı çok az ({len(df)} < {MIN_CLUSTER_SIZE}), atlanıyor.")
             return
 
-        from sklearn.model_selection import train_test_split
+        n_pos = int(y.sum())
+        if n_pos < MIN_POSITIVE_SAMPLES:
+            print(f"⚠️ Client {self.id}: Pozitif örnek çok az ({n_pos} < {MIN_POSITIVE_SAMPLES}), "
+                  f"anlamlı sınır öğrenilemez — atlanıyor.")
+            return
 
-        scaler = StandardScaler()
+        self.scaler = StandardScaler()
         X = pd.get_dummies(X, drop_first=True)
 
         if self.expected_columns is not None:
@@ -115,156 +113,242 @@ class Client:
                     X[col] = 0
             X = X[self.expected_columns]
 
-        X_scaled = scaler.fit_transform(X)
-        y_arr = y.values
+        # Determine split sizes BEFORE scaling so we know model_type early
+        n = len(X)
+        if n < 1000:
+            train_end = int(0.8 * n)
+            val_end   = int(0.9 * n)
+        else:
+            train_end = int(0.6 * n)
+            val_end   = int(0.8 * n)
 
-        # Stratified split so both halves have positives
-        try:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_arr, test_size=0.2, stratify=y_arr, random_state=42
-            )
-        except ValueError:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_arr, test_size=0.2, random_state=42
-            )
+        # Auto-select model based on training set size:
+        #   small  (< 2000): ExactGP + GaussianLikelihood + ExactMLL + Laplace probit at predict
+        #   sparse (≥ 2000): SVGP  + BernoulliLikelihood  + VariationalELBO + MC samples at predict
+        self.model_type = "small" if train_end < 2000 else "sparse"
 
-        # Balance train: oversample minority class
-        pos_idx = np.where(y_train == 1)[0]
-        neg_idx = np.where(y_train == 0)[0]
-        if len(pos_idx) > 0 and len(pos_idx) < len(neg_idx):
-            rng = np.random.default_rng(42)
-            extra = rng.choice(pos_idx, size=len(neg_idx) - len(pos_idx), replace=True)
-            aug_idx = np.concatenate([np.arange(len(y_train)), extra])
-            rng.shuffle(aug_idx)
-            X_train = X_train[aug_idx]
-            y_train = y_train[aug_idx]
+        # Standardization: ON for ExactGP (small data — lengthscale prior matters),
+        #                  OFF for SVGP  (large data — inducing points initialized in raw space)
+        if self.model_type == "small":
+            X_scaled = self.scaler.fit_transform(X)
+            std_tag = "ON  (ExactGP)"
+        else:
+            X_scaled = X.values.astype(np.float64)
+            std_tag = "OFF (SVGP)"
+        print(f"  [Client {self.id}] standardization={std_tag}  n_train={train_end}")
 
-        # Balance test: undersample majority class
-        pos_test = np.where(y_test == 1)[0]
-        neg_test = np.where(y_test == 0)[0]
-        if len(pos_test) > 0 and len(neg_test) > len(pos_test):
-            rng2 = np.random.default_rng(42)
-            neg_keep = rng2.choice(neg_test, size=len(pos_test), replace=False)
-            keep_idx = np.concatenate([pos_test, neg_keep])
-            rng2.shuffle(keep_idx)
-            X_test = X_test[keep_idx]
-            y_test = y_test[keep_idx]
+        self.X_tensor = torch.tensor(X_scaled).float()
+        self.y_tensor = torch.tensor(y.values).float()
 
-        self.train_x = torch.tensor(X_train).float()
-        self.train_y = torch.tensor(y_train).float()
-        self.test_x = torch.tensor(X_test).float()
-        self.test_y = torch.tensor(y_test).float()
-        self.num_features = self.train_x.shape[1]
-        train_size = len(X_train)
+        self.train_x = self.X_tensor[:train_end]
+        self.train_y = self.y_tensor[:train_end]
+        self.val_x   = self.X_tensor[train_end:val_end]
+        self.val_y   = self.y_tensor[train_end:val_end]
+        self.test_x  = self.X_tensor[val_end:]
+        self.test_y  = self.y_tensor[val_end:]
 
-        device = self.train_x.device
-
-        n_ip = num_inducing_points if num_inducing_points is not None else _choose_num_inducing(train_size)
-        n_ip = min(n_ip, train_size)
-
-        # Stratified inducing points: 50% from positives, 50% from negatives
-        pos_ip_pool = (self.train_y == 1).nonzero(as_tuple=True)[0]
-        neg_ip_pool = (self.train_y == 0).nonzero(as_tuple=True)[0]
-        n_pos_ip = min(n_ip // 2, len(pos_ip_pool))
-        n_neg_ip = min(n_ip - n_pos_ip, len(neg_ip_pool))
-        pos_ip_idx = pos_ip_pool[torch.randperm(len(pos_ip_pool))[:n_pos_ip]]
-        neg_ip_idx = neg_ip_pool[torch.randperm(len(neg_ip_pool))[:n_neg_ip]]
-        inducing_indices = torch.cat([pos_ip_idx, neg_ip_idx])
-        inducing_points = self.train_x[inducing_indices].clone().to(device)
-
-        kernel = build_kernel(self.kernel_type, self.num_features)
-        self.model = SVGPClassificationModel(inducing_points, kernel)
-        self.likelihood = gpytorch.likelihoods.BernoulliLikelihood()
-
-        print(f"🔧 Client {self.id}: SVGP Classification | {n_ip} inducing pts | kernel={self.kernel_type}")
-
-        # NGD for variational parameters (mean/covariance in natural space)
-        # Adam for kernel hyperparameters, likelihood, and inducing locations
-        self.variational_optimizer = NGD(
-            self.model.variational_parameters(), num_data=train_size, lr=0.1
-        )
-        self.hyperparameter_optimizer = torch.optim.Adam([
-            {'params': self.model.hyperparameters()},
-            {'params': self.likelihood.parameters()},
-        ], lr=0.01)
-        self.mll = gpytorch.mlls.VariationalELBO(
-            self.likelihood, self.model, num_data=train_size
-        )
+        if self.model_type == "small":
+            # Targets mapped to {-1, +1} so latent f spans (-∞,+∞).
+            # This makes the Laplace probit valid:
+            #   negative class → posterior mean ≈ -1 → σ(κ·(-1)) < 0.5
+            #   positive class → posterior mean ≈ +1 → σ(κ·(+1)) > 0.5
+            train_y_signed = 2.0 * self.train_y - 1.0  # {0,1} → {-1,+1}
+            self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+            self.model = SmallDatasetGPModel(self.train_x, train_y_signed, self.likelihood)
+            # ExactGP stores likelihood as a submodule → model.parameters() already covers it
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+            self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+            self.model.covar_module.outputscale = torch.tensor(5.0)
+            self.model.covar_module.base_kernel.lengthscale = torch.tensor([[1.0]])
+            print(f"🔧 Client {self.id}: ExactGP+Laplace | n_train={len(self.train_x)}")
+        else:
+            self.likelihood = gpytorch.likelihoods.BernoulliLikelihood()
+            actual_num_inducing = min(self.num_inducing_points, len(self.train_x))
+            inducing_indices = torch.randperm(len(self.train_x))[:actual_num_inducing]
+            inducing_points = self.train_x[inducing_indices].clone()
+            self.model = SparseGPModel(inducing_points)
+            self.optimizer = torch.optim.Adam([
+                {'params': self.model.parameters()},
+                {'params': self.likelihood.parameters()},
+            ], lr=0.1)
+            self.mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=len(self.train_y))
+            # outputscale=4 → GP mean ±2 → sigmoid [0.12, 0.88] — prevents collapse to 0.5
+            self.model.covar_module.outputscale = torch.tensor(4.0)
+            self.model.covar_module.base_kernel.lengthscale = torch.tensor([[0.5]])
+            print(f"🔧 Client {self.id}: SparseGP+Bernoulli | {actual_num_inducing} inducing")
 
         self.has_data = True
 
-    def train_local(self, training_iter=50, batch_size=256):
+    def _balance_training_data(self, max_ratio=3.0):
+        """
+        Pozitif class'ı oversample ederek negatif/pozitif oranını max_ratio:1'e çeker.
+        max_ratio=None → ham veriyi döndür (oversampling yok).
+        max_ratio=3   → negatif sayısı pozitifin en fazla 3 katı olur.
+        """
+        if max_ratio is None:
+            return self.train_x, self.train_y
+
+        pos_idx = (self.train_y == 1).nonzero(as_tuple=True)[0]
+        neg_idx = (self.train_y == 0).nonzero(as_tuple=True)[0]
+
+        if len(pos_idx) == 0:
+            return self.train_x, self.train_y
+
+        max_neg = int(len(pos_idx) * max_ratio)
+        if len(neg_idx) > max_neg:
+            perm = torch.randperm(len(neg_idx))[:max_neg]
+            neg_idx = neg_idx[perm]
+
+        repeat = max(1, max_neg // len(pos_idx))
+        pos_idx_repeated = pos_idx.repeat(repeat)
+
+        all_idx = torch.cat([pos_idx_repeated, neg_idx])
+        all_idx = all_idx[torch.randperm(len(all_idx))]
+
+        balanced_x = self.train_x[all_idx]
+        balanced_y = self.train_y[all_idx]
+
+        print(f"  Balanced: {len(pos_idx_repeated)} pos + {len(neg_idx)} neg = {len(all_idx)} total")
+        return balanced_x, balanced_y
+
+    def train_local(self, training_iter=50):
         if not self.has_data:
             return
+
+        # ExactGP handles imbalance via MLL directly; oversampling biases the posterior.
+        # For extreme imbalance (pos < 10%) use 4:1 ratio to guarantee enough positive signal.
+        orig_pos = self.train_y.mean().item()
+        if self.model_type == "sparse":
+            if orig_pos < 0.05:
+                oversample_ratio = 5.0   # extreme: ≥17% positive after balance
+            elif orig_pos < 0.10:
+                oversample_ratio = 4.0   # severe: ≥20% positive after balance
+            else:
+                oversample_ratio = 3.0   # normal: ≥25% positive after balance
+        else:
+            oversample_ratio = None
+        train_x, train_y = self._balance_training_data(max_ratio=oversample_ratio)
 
         self.model.train()
         self.likelihood.train()
 
-        n = len(self.train_x)
-        effective_batch = min(batch_size, n)
-        dataset = torch.utils.data.TensorDataset(self.train_x, self.train_y)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=effective_batch, shuffle=True)
+        # ExactGP caches training data — update before each training run (signed targets)
+        if self.model_type == "small":
+            self.model.set_train_data(train_x, 2.0 * train_y - 1.0, strict=False)
 
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.hyperparameter_optimizer, T_max=training_iter, eta_min=1e-4
-        )
+        pos_ratio = train_y.mean().item()
+        pre_os = self.model.covar_module.outputscale.item()
+        pre_ls = self.model.covar_module.base_kernel.lengthscale.item()
+        print(f"Client {self.id} train start | n={len(train_x)} pos={pos_ratio:.3f} "
+              f"| params_before: os={pre_os:.4f} ls={pre_ls:.4f}")
 
-        print(f"Client {self.id} training... (n={n}, epochs={training_iter}, batch={effective_batch})")
+        for i in range(training_iter):
+            self.optimizer.zero_grad()
+            if self.model_type == "small":
+                # ExactMLL with {-1,+1} targets — latent f spans (-∞,+∞) for valid probit
+                output = self.model(train_x)
+                loss = -self.mll(output, 2.0 * train_y - 1.0)
+            else:
+                # VariationalELBO with BernoulliLikelihood — requires MC integration
+                with gpytorch.settings.num_likelihood_samples(16):
+                    output = self.model(train_x)
+                    loss = -self.mll(output, train_y)
+            loss.backward()
+            self.optimizer.step()
 
-        with gpytorch.settings.cholesky_jitter(1e-3):
-            for epoch in range(training_iter):
-                for x_batch, y_batch in loader:
-                    self.variational_optimizer.zero_grad()
-                    self.hyperparameter_optimizer.zero_grad()
-                    output = self.model(x_batch)
-                    loss = -self.mll(output, y_batch)
-                    loss.backward()
-                    self.variational_optimizer.step()
-                    self.hyperparameter_optimizer.step()
+            if torch.isnan(loss):
+                print(f"⚠️ Client {self.id}: Loss NaN, durduruluyor.")
+                break
 
-                    if torch.isnan(loss):
-                        print(f"⚠️ Client {self.id}: Loss NaN at epoch {epoch}, stopping early.")
-                        return
+        # DEBUG — GP latent mean range (sıfıra yakınsa kernel converge edememiş demektir)
+        self.model.eval()
+        with torch.no_grad():
+            sample = self.val_x[:min(100, len(self.val_x))]
+            gp_out = self.model(sample)
+            gp_mean = gp_out.mean
+            os = self.model.covar_module.outputscale.item()
+            ls = self.model.covar_module.base_kernel.lengthscale.item()
+            print(f"  Client {self.id} params_after: os={os:.4f} ls={ls:.4f} "
+                  f"| GP mean=[{gp_mean.min():.3f}, {gp_mean.max():.3f}]")
 
-                scheduler.step()
+        self._find_optimal_threshold()
 
-    def send_params(self):
+    def _get_probs(self, X_tensor):
         """
-        Serialize kernel hyperparameters for federated aggregation.
-        Format: [log(output_scale), log(ls_1), ..., log(ls_d), mean_constant]
-        """
-        if not self.has_data:
-            return None
-        output_scale = self.model.covar_module.outputscale.item()
-        ls = self.model.covar_module.base_kernel.lengthscale.detach().cpu().numpy().flatten()
-        mean_const = self.model.mean_module.constant.item()
-        return np.concatenate([[np.log(output_scale)], np.log(ls), [mean_const]])
+        Model tipine göre class probability üretir:
 
-    def set_params(self, params):
+        small  — Laplace probit approximation (R&W 2006, §3.4.3, eq. 3.82):
+                   P(y=1|x*) ≈ σ(μ* / √(1 + π/8·σ²*))
+                 ExactGP posterior mean μ* ve variance σ²* analytically tractable.
+
+        sparse — BernoulliLikelihood + 64 MC samples:
+                   P(y=1|x*) ≈ (1/S) Σ σ(f^(s)(x*))
         """
-        Deserialize and apply aggregated kernel hyperparameters.
-        Format: [log(output_scale), log(ls_1..d), mean_constant]
-        Preserves Adam momentum buffers across FL rounds for faster convergence.
+        self.model.eval()
+        self.likelihood.eval()
+
+        with torch.no_grad():
+            if self.model_type == "small":
+                with gpytorch.settings.fast_pred_var():
+                    pred = self.likelihood(self.model(X_tensor))
+                    mu  = pred.mean.detach().cpu().numpy()
+                    var = pred.variance.detach().cpu().numpy()
+                # Probit correction — shrinks latent mean by posterior uncertainty
+                kappa = 1.0 / np.sqrt(1.0 + np.pi / 8.0 * np.clip(var, 0, None))
+                return (1.0 / (1.0 + np.exp(-kappa * mu))).flatten()
+            else:
+                with gpytorch.settings.num_likelihood_samples(64):
+                    pred = self.likelihood(self.model(X_tensor))
+                    probs = pred.probs.detach().cpu().numpy()
+                    if probs.ndim == 2:
+                        probs = probs.mean(axis=0)  # (S, N) → (N,)
+                    return probs.flatten()
+
+    def _find_optimal_threshold(self):
         """
-        if not self.has_data:
+        Validation set üzerinde F1'i maximize eden threshold'u bul.
+        Imbalanced dataset'lerde 0.5 genellikle suboptimal.
+        """
+        if len(self.val_x) == 0:
             return
-        new_output_scale = float(np.exp(params[0]))
-        new_ls = np.exp(params[1:-1])
-        new_mean = float(params[-1])
 
-        self.model.covar_module.outputscale = torch.tensor(new_output_scale).float()
-        ls_tensor = torch.tensor(new_ls, dtype=torch.float32).unsqueeze(0)
-        self.model.covar_module.base_kernel.lengthscale = ls_tensor
-        self.model.mean_module.constant.data.fill_(new_mean)
+        probs = self._get_probs(self.val_x)
+        labels = self.val_y.numpy()
 
-        # Reset LR to initial value but keep Adam momentum for warm-starting
-        for pg in self.hyperparameter_optimizer.param_groups:
-            pg['lr'] = 0.01
+        # DEBUG — model gerçekten bir şey öğrenmiş mi?
+        print(f"  [DEBUG] Probs  min={probs.min():.4f}  max={probs.max():.4f}  "
+              f"mean={probs.mean():.4f} | labels_pos={labels.mean():.3f}")
+
+        # Sadece iki class varsa threshold search yap
+        if len(np.unique(labels)) < 2:
+            return
+
+        # Minimum precision floor: threshold search'te "hepsini pozitif say" çözümünü engelle.
+        # En az 2x base rate precision gerektir (örn. %15 pozitif → min precision %30).
+        base_rate = labels.mean()
+        min_precision = min(2.0 * base_rate, 0.5)  # üst sınır 0.5
+
+        best_t, best_f1 = 0.5, 0.0
+        for t in np.arange(0.05, 0.95, 0.005):
+            preds = (probs > t).astype(float)
+            if preds.sum() == 0:
+                continue
+            prec = precision_score(labels, preds, zero_division=0)
+            if prec < min_precision:
+                continue
+            f1 = f1_score(labels, preds, zero_division=0)
+            if f1 > best_f1:
+                best_f1 = f1
+                best_t = float(t)
+
+        self.optimal_threshold = best_t
+        print(f"  → Client {self.id}: optimal threshold = {best_t:.3f} (val F1={best_f1:.4f})")
 
     def predict(self, X_test_tensor=None):
         """
-        Returns (probs, hard_labels) where probs are class-1 probabilities in [0,1]
-        and hard_labels are {0,1} thresholded at fixed 0.5.
+        Returns (probs, hard_labels).
+        probs: sigmoid(f(x)) — class-1 probability
+        hard_labels: {0, 1} thresholded at optimal_threshold
         """
         if not self.has_data:
             return None, None
@@ -272,16 +356,89 @@ class Client:
         if X_test_tensor is None:
             X_test_tensor = self.test_x
 
-        self.model.eval()
-        self.likelihood.eval()
+        probs = self._get_probs(X_test_tensor)
+        y_hard = (probs > self.optimal_threshold).astype(float)
 
-        with torch.no_grad(), gpytorch.settings.fast_pred_var(), gpytorch.settings.cholesky_jitter(1e-3):
-            pred_dist = self.likelihood(self.model(X_test_tensor))
-            y_probs = pred_dist.probs.detach().cpu().numpy()
-            threshold = 0.5
-            y_hard = (y_probs > threshold).astype(float)
+        return probs, y_hard
 
-        return y_probs, y_hard
+    def evaluate(self, X_test_tensor=None, y_true=None, verbose=True):
+        """
+        Tam classification metrikleri: Accuracy, F1, Precision, Recall, ROC-AUC
+        """
+        if not self.has_data:
+            return None
+
+        if X_test_tensor is None:
+            X_test_tensor = self.test_x
+        if y_true is None:
+            y_true = self.test_y.numpy()
+        elif torch.is_tensor(y_true):
+            y_true = y_true.numpy()
+
+        probs, y_hard = self.predict(X_test_tensor)
+
+        if len(np.unique(y_true)) < 2:
+            if verbose:
+                print(f"Client {self.id}: Test set'te tek class var, metrik hesaplanamıyor.")
+            return None
+
+        acc = accuracy_score(y_true, y_hard)
+        f1 = f1_score(y_true, y_hard, zero_division=0)
+        prec = precision_score(y_true, y_hard, zero_division=0)
+        rec = recall_score(y_true, y_hard, zero_division=0)
+        auc = roc_auc_score(y_true, probs)
+        cm = confusion_matrix(y_true, y_hard)
+
+        if verbose:
+            print(f"\n📊 Client {self.id} Evaluation (threshold={self.optimal_threshold:.2f}):")
+            print(f"  Accuracy  : {acc:.4f}")
+            print(f"  F1 Score  : {f1:.4f}")
+            print(f"  Precision : {prec:.4f}")
+            print(f"  Recall    : {rec:.4f}")
+            print(f"  ROC-AUC   : {auc:.4f}")
+            print(f"  Confusion Matrix:\n{cm}")
+
+        return {
+            "accuracy": acc, "f1": f1, "precision": prec,
+            "recall": rec, "roc_auc": auc, "confusion_matrix": cm,
+            "threshold": self.optimal_threshold
+        }
+
+    def send_params(self):
+        if not self.has_data:
+            return None
+        output_scale = self.model.covar_module.outputscale.item()
+        length_scale = self.model.covar_module.base_kernel.lengthscale.item()
+        mean_constant = self.model.mean_module.constant.item()
+        return np.array([np.log(output_scale), np.log(length_scale), mean_constant])
+
+    def set_params(self, params):
+        if not self.has_data:
+            return
+        new_output_scale = float(np.exp(params[0]))
+        new_length_scale = float(np.exp(params[1]))
+        new_mean_constant = float(params[2])
+
+        # Use initialize() so GPyTorch's constraint transform is respected
+        self.model.covar_module.outputscale = torch.tensor(new_output_scale)
+        self.model.covar_module.base_kernel.lengthscale = torch.tensor([[new_length_scale]])
+        self.model.mean_module.constant.data = torch.tensor(new_mean_constant)
+
+        # Verify what was actually set (constraint may clip the value)
+        actual_ls = self.model.covar_module.base_kernel.lengthscale.item()
+        actual_os = self.model.covar_module.outputscale.item()
+        print(f"  [FL] Client {self.id} ← global: os={actual_os:.4f}  ls={actual_ls:.4f}  "
+              f"mean={new_mean_constant:.4f}  (requested ls={new_length_scale:.4f})")
+
+        if self.model_type == "small":
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+        else:
+            self.optimizer = torch.optim.Adam([
+                {'params': self.model.parameters()},
+                {'params': self.likelihood.parameters()},
+            ], lr=0.1)
+
+        self.optimal_threshold = 0.5
 
     def get_learner(self):
         return self
@@ -290,5 +447,10 @@ class Client:
         if not self.has_data:
             return None
         output_scale = self.model.covar_module.outputscale.item()
-        length_scale = self.model.covar_module.base_kernel.lengthscale.detach().cpu().numpy().flatten()
-        return output_scale, length_scale
+        length_scale = self.model.covar_module.base_kernel.lengthscale.item()
+        mean_constant = self.model.mean_module.constant.item()
+        return output_scale, length_scale, mean_constant
+
+    def test_global_model(self):
+        """Geriye dönük uyumluluk için — artık classification metrikleri döndürüyor."""
+        return self.evaluate()

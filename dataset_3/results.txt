@@ -1,0 +1,35 @@
+Data Set: dataset_3/diabetes_3.csv
+
+============================================================
+FEATURE: HIGHBP | CLUSTERS: 2 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=45944):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4496
+  ROC-AUC     | 0.7949
+  Accuracy    | 0.6291
+  Precision   | 0.3057
+  Recall      | 0.8489
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - No High BP (n=125336):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.3400
+  ROC-AUC     | 0.7933
+  Accuracy    | 0.8371
+  Precision   | 0.2631
+  Recall      | 0.4804
+----------------------------------------
+Client 2 - High BP (n=104376):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4769
+  ROC-AUC     | 0.7221
+  Accuracy    | 0.3793
+  Precision   | 0.3148
+  Recall      | 0.9832
+----------------------------------------
