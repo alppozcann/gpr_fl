@@ -15,39 +15,38 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 DATASET_NUMBER = 1
 
 DATASET_CONFIGS = {
-    # Dataset 1: 100k rows, medical features (HbA1c, glucose, BMI, age)
+    # Dataset 1: 100k rows — SVGP, Matérn 2.5, Bernoulli(MC), no standardization, oversampling ON
     1: {
-        "NUM_INDUCING_POINTS": 1000,  # 500→1000: better coverage of 100k-row clusters
+        "NUM_INDUCING_POINTS": 1000,
         "KERNEL_TYPE": "matern",
-        "NUM_FL_ROUNDS": 8,           # 5→8: more federation consensus rounds
-        "LOCAL_EPOCHS_PER_ROUND": 80, # 50→80: longer local convergence per round
-        "BATCH_SIZE": 512,
+        "STANDARDIZE": False,
+        "NUM_FL_ROUNDS": 8,
+        "LOCAL_EPOCHS_PER_ROUND": 80,
     },
-    # Dataset 2: 769 rows (Pima Indians) — small clusters, more rounds for better consensus
+    # Dataset 2: 769 rows (Pima Indians) — ExactGP, Matérn 2.5, Gaussian(Laplace), standardization ON, oversampling OFF
     2: {
         "NUM_INDUCING_POINTS": 75,
         "KERNEL_TYPE": "matern",
+        "STANDARDIZE": True,
         "NUM_FL_ROUNDS": 7,
         "LOCAL_EPOCHS_PER_ROUND": 80,
-        "BATCH_SIZE": 32,
     },
-    # Dataset 3: 229k rows (BRFSS survey) — large clusters, large batches
+    # Dataset 3: 229k rows (BRFSS survey) — SVGP, Matérn 2.5, Bernoulli(MC), standardization ON, oversampling ON, 8 features specified from the co
     3: {
         "NUM_INDUCING_POINTS": 1000,
         "KERNEL_TYPE": "matern",
+        "STANDARDIZE": True,
         "NUM_FL_ROUNDS": 5,
-        "LOCAL_EPOCHS_PER_ROUND": 30,
-        "BATCH_SIZE": 512,
+        "LOCAL_EPOCHS_PER_ROUND": 100,
     },
 }
 
 _cfg = DATASET_CONFIGS[DATASET_NUMBER]
-GP_TYPE = "sparse"       # kept for API compatibility — always uses SVGP classification
-NUM_INDUCING_POINTS = _cfg["NUM_INDUCING_POINTS"]
-KERNEL_TYPE         = _cfg["KERNEL_TYPE"]
-NUM_FL_ROUNDS       = _cfg["NUM_FL_ROUNDS"]
+NUM_INDUCING_POINTS    = _cfg["NUM_INDUCING_POINTS"]
+KERNEL_TYPE            = _cfg["KERNEL_TYPE"]
+STANDARDIZE            = _cfg["STANDARDIZE"]
+NUM_FL_ROUNDS          = _cfg["NUM_FL_ROUNDS"]
 LOCAL_EPOCHS_PER_ROUND = _cfg["LOCAL_EPOCHS_PER_ROUND"]
-BATCH_SIZE          = _cfg["BATCH_SIZE"]
 DATASET = f"dataset_{DATASET_NUMBER}/"
 DATA_TABLE = f"diabetes_{DATASET_NUMBER}.csv"
 csv_file = os.path.join(DATASET, DATA_TABLE)
@@ -118,8 +117,9 @@ def run_experiment(feature_name):
         temp_csv = f"temp_cluster_{i}.csv"
         cluster_df.to_csv(temp_csv, index=False)
         
-        client = Client(client_id=i+1, csv_path=temp_csv, gp_type=GP_TYPE,
-                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns)
+        client = Client(client_id=i+1, csv_path=temp_csv,
+                       num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns,
+                       kernel_type=KERNEL_TYPE, standardize=STANDARDIZE)
         if client.has_data:
             clients.append(client)
             client_sizes.append(len(client.train_x))
@@ -140,8 +140,7 @@ def run_experiment(feature_name):
         contributing_sizes = []
 
         for client, size in zip(clients, client_sizes):
-            iters = max(LOCAL_EPOCHS_PER_ROUND, 100 if len(client.train_x) > 50000 else 50)
-            client.train_local(training_iter=iters)
+            client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND)
 
             pos_ratio = client.train_y.mean().item()
             if pos_ratio < MIN_POS_RATIO:

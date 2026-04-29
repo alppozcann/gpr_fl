@@ -7,21 +7,16 @@ from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_sc
 
 
 class SmallDatasetGPModel(gpytorch.models.ExactGP):
-    """
-    ExactGP + GaussianLikelihood for small datasets (n < 2000).
+    """ExactGP + GaussianLikelihood for small datasets (n < 2000).
 
     Training: ExactMarginalLogLikelihood on {-1,+1} targets (signed GP surrogate).
     Inference: Laplace probit approximation — P(y=1|x*) ≈ σ(μ* / √(1 + π/8·σ²*))
                from Rasmussen & Williams (2006) §3.4.3, eq. 3.82.
     """
-    def __init__(self, train_x, train_y, likelihood):
+    def __init__(self, train_x, train_y, likelihood, kernel):
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
-        # Constrain lengthscale to [0.1, 3.0] — prevents over-smoothing that collapses probs to 0.5
-        self.covar_module.base_kernel.register_constraint(
-            "raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0)
-        )
+        self.covar_module = gpytorch.kernels.ScaleKernel(kernel)
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -30,11 +25,9 @@ class SmallDatasetGPModel(gpytorch.models.ExactGP):
 
 
 class SparseGPModel(gpytorch.models.ApproximateGP):
-    """
-    Sparse GP using Variational Inference with inducing points.
-    Reduces complexity from O(n³) to O(nm²) where m = number of inducing points.
-    """
-    def __init__(self, inducing_points):
+    """Sparse GP using Variational Inference with inducing points.
+    Reduces complexity from O(n³) to O(nm²) where m = number of inducing points."""
+    def __init__(self, inducing_points, kernel):
         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             inducing_points.size(0)
         )
@@ -42,13 +35,8 @@ class SparseGPModel(gpytorch.models.ApproximateGP):
             self, inducing_points, variational_distribution, learn_inducing_locations=True
         )
         super(SparseGPModel, self).__init__(variational_strategy)
-
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
-        # Constrain lengthscale to [0.1, 3.0] — prevents over-smoothing that collapses probs to 0.5
-        self.covar_module.base_kernel.register_constraint(
-            "raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0)
-        )
+        self.covar_module = gpytorch.kernels.ScaleKernel(kernel)
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -61,12 +49,14 @@ MIN_POSITIVE_SAMPLES = 30  # absolute minimum positives — below this no meanin
 
 
 class Client:
-    def __init__(self, client_id, csv_path, gp_type="exact", num_inducing_points=100, expected_columns=None):
+    def __init__(self, client_id, csv_path, num_inducing_points=100, expected_columns=None,
+                 kernel_type="matern", standardize=False):
         self.id = client_id
         self.csv_path = csv_path
         self.has_data = False
-        self.gp_type = gp_type.lower()
         self.num_inducing_points = num_inducing_points
+        self.kernel_type = kernel_type
+        self.standardize = standardize
         self.expected_columns = expected_columns
         self.optimal_threshold = 0.5  # Validation'da öğrenilecek
 
@@ -127,15 +117,11 @@ class Client:
         #   sparse (≥ 2000): SVGP  + BernoulliLikelihood  + VariationalELBO + MC samples at predict
         self.model_type = "small" if train_end < 2000 else "sparse"
 
-        # Standardization: ON for ExactGP (small data — lengthscale prior matters),
-        #                  OFF for SVGP  (large data — inducing points initialized in raw space)
-        if self.model_type == "small":
+        if self.standardize:
             X_scaled = self.scaler.fit_transform(X)
-            std_tag = "ON  (ExactGP)"
         else:
             X_scaled = X.values.astype(np.float64)
-            std_tag = "OFF (SVGP)"
-        print(f"  [Client {self.id}] standardization={std_tag}  n_train={train_end}")
+        print(f"  [Client {self.id}] standardization={'ON' if self.standardize else 'OFF'}  n_train={train_end}")
 
         self.X_tensor = torch.tensor(X_scaled).float()
         self.y_tensor = torch.tensor(y.values).float()
@@ -147,6 +133,8 @@ class Client:
         self.test_x  = self.X_tensor[val_end:]
         self.test_y  = self.y_tensor[val_end:]
 
+        kernel = self._build_kernel()
+
         if self.model_type == "small":
             # Targets mapped to {-1, +1} so latent f spans (-∞,+∞).
             # This makes the Laplace probit valid:
@@ -154,19 +142,19 @@ class Client:
             #   positive class → posterior mean ≈ +1 → σ(κ·(+1)) > 0.5
             train_y_signed = 2.0 * self.train_y - 1.0  # {0,1} → {-1,+1}
             self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-            self.model = SmallDatasetGPModel(self.train_x, train_y_signed, self.likelihood)
+            self.model = SmallDatasetGPModel(self.train_x, train_y_signed, self.likelihood, kernel)
             # ExactGP stores likelihood as a submodule → model.parameters() already covers it
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
             self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
             self.model.covar_module.outputscale = torch.tensor(5.0)
             self.model.covar_module.base_kernel.lengthscale = torch.tensor([[1.0]])
-            print(f"🔧 Client {self.id}: ExactGP+Laplace | n_train={len(self.train_x)}")
+            print(f"🔧 Client {self.id}: ExactGP+Laplace+{self.kernel_type} | n_train={len(self.train_x)}")
         else:
             self.likelihood = gpytorch.likelihoods.BernoulliLikelihood()
             actual_num_inducing = min(self.num_inducing_points, len(self.train_x))
             inducing_indices = torch.randperm(len(self.train_x))[:actual_num_inducing]
             inducing_points = self.train_x[inducing_indices].clone()
-            self.model = SparseGPModel(inducing_points)
+            self.model = SparseGPModel(inducing_points, kernel)
             self.optimizer = torch.optim.Adam([
                 {'params': self.model.parameters()},
                 {'params': self.likelihood.parameters()},
@@ -175,9 +163,14 @@ class Client:
             # outputscale=4 → GP mean ±2 → sigmoid [0.12, 0.88] — prevents collapse to 0.5
             self.model.covar_module.outputscale = torch.tensor(4.0)
             self.model.covar_module.base_kernel.lengthscale = torch.tensor([[0.5]])
-            print(f"🔧 Client {self.id}: SparseGP+Bernoulli | {actual_num_inducing} inducing")
+            print(f"🔧 Client {self.id}: SparseGP+Bernoulli+{self.kernel_type} | {actual_num_inducing} inducing")
 
         self.has_data = True
+
+    def _build_kernel(self):
+        k = gpytorch.kernels.MaternKernel(nu=2.5)
+        k.register_constraint("raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0))
+        return k
 
     def _balance_training_data(self, max_ratio=3.0):
         """
