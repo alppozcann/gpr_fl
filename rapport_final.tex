@@ -1,0 +1,254 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Rapport Final\\
+\large Apprentissage Fédéré Clustérisé avec Processus Gaussiens\\
+pour la Prédiction du Diabète}
+\author{Alp Özcan — 22401007}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% -----------------------------------------------------------------------
+
+\section{Premiers Résultats}
+
+Les expériences ont été menées sur trois datasets de nature et de taille différentes. Pour chaque dataset, le système d'apprentissage fédéré clustérisé est évalué en mode clustering par feature : chaque client correspond à un sous-groupe défini par une valeur spécifique d'une feature, et les hyperparamètres du noyau sont agrégés par moyenne pondérée entre les clients à chaque round de fédération.
+
+\subsubsection*{Dataset 1 — DPD (SparseGP, noyau RBF, 100 points inducteurs)}
+
+Le dataset DPD contient environ 100\,000 exemples. En raison de cette taille, un modèle SparseGP avec 100 points inducteurs a été utilisé. Le clustering est réalisé par feature, et les résultats moyens par feature sont présentés dans le tableau~\ref{tab:dpd_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset DPD (SparseGP, RBF)}
+\label{tab:dpd_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+gender               & 0.9591 & 0.8277 & 0.6461 & 0.7257 \\
+age                  & 0.9565 & 0.8842 & 0.5523 & 0.6799 \\
+hypertension         & 0.9594 & 0.8087 & 0.6715 & 0.7337 \\
+heart\_disease        & 0.9593 & 0.8101 & 0.6707 & 0.7338 \\
+smoking\_history     & 0.9601 & 0.8168 & 0.6713 & 0.7369 \\
+bmi                  & 0.9560 & 0.7963 & 0.6370 & 0.7078 \\
+HbA1c\_level         & 0.9629 & 0.9473 & 0.5847 & 0.7231 \\
+blood\_glucose\_level & 0.9604 & 0.9800 & 0.5329 & 0.6904 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection*{Dataset 2 — Pima Indian (ExactGP, noyau RBF)}
+
+Le dataset Pima Indian contient 769 exemples, ce qui permet d'utiliser un modèle ExactGP sans approximation. Les résultats par feature sont donnés dans le tableau~\ref{tab:pima_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset Pima Indian (ExactGP, RBF)}
+\label{tab:pima_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+Pregnancies       & 0.7871 & 0.6528 & 0.8545 & 0.7402 \\
+Glucose           & 0.7895 & 0.6852 & 0.7115 & 0.6981 \\
+BloodPressure     & 0.7597 & 0.6389 & 0.8070 & 0.7132 \\
+SkinThickness     & 0.7885 & 0.6575 & 0.8571 & 0.7442 \\
+Insulin           & 0.7727 & 0.6780 & 0.7143 & 0.6957 \\
+BMI               & 0.7632 & 0.6452 & 0.7407 & 0.6897 \\
+DiabetesPedigree  & 0.7597 & 0.6909 & 0.6552 & 0.6726 \\
+Age               & 0.7806 & 0.7143 & 0.6897 & 0.7018 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection*{Dataset 3 — BRFSS (SparseGP, noyau Matérn + ARD, 100 points inducteurs)}
+
+Le dataset BRFSS contient environ 229\,000 exemples et 22 features initiales réduites à 8 par sélection par corrélation. Un modèle SparseGP avec noyau Matérn et ARD (\textit{Automatic Relevance Determination}) a été utilisé. Les résultats sont présentés dans le tableau~\ref{tab:brfss_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset BRFSS (SparseGP, Matérn + ARD)}
+\label{tab:brfss_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+HighBP                & 0.7780 & 0.4110 & 0.5637 & 0.4754 \\
+HighChol              & 0.7487 & 0.3834 & 0.6707 & 0.4879 \\
+BMI                   & 0.7694 & 0.4019 & 0.6035 & 0.4825 \\
+HeartDiseaseorAttack  & 0.7519 & 0.3834 & 0.6433 & 0.4805 \\
+GenHlth               & 0.7390 & 0.3630 & 0.6843 & 0.4744 \\
+PhysHlth              & 0.7754 & 0.4099 & 0.6123 & 0.4911 \\
+DiffWalk              & 0.7759 & 0.4072 & 0.5816 & 0.4790 \\
+Age                   & 0.7610 & 0.4010 & 0.6462 & 0.4948 \\
+\hline
+\end{tabular}
+\end{table}
+
+% -----------------------------------------------------------------------
+
+\section{Analyse de ces Résultats, Premières Impressions et Vérification}
+
+\subsubsection*{Dataset DPD}
+
+L'accuracy dépasse 0.95 pour toutes les features, ce qui s'explique principalement par le déséquilibre de classes : les cas diabétiques sont très minoritaires dans ce dataset. Le recall modéré (0.53–0.67) confirme que le modèle ne détecte pas tous les cas positifs. Les features \texttt{HbA1c\_level} et \texttt{blood\_glucose\_level} se distinguent avec une precision très élevée (0.9473 et 0.9800), cohérente avec leur rôle de marqueurs médicaux directs du diabète.
+
+\subsubsection*{Dataset Pima Indian}
+
+Les performances sont plus modestes (accuracy 0.76–0.79), ce qui est attendu vu la taille réduite du dataset. Le recall est particulièrement élevé pour \texttt{SkinThickness} (0.8571) et \texttt{Pregnancies} (0.8545), ce qui est satisfaisant dans un contexte médical où les faux négatifs sont coûteux. Le F1-Score autour de 0.70 constitue un résultat raisonnable pour un dataset de cette taille.
+
+\subsubsection*{Dataset BRFSS}
+
+C'est le dataset le plus difficile. La precision reste faible (0.36–0.41), en raison du fort déséquilibre de classes et de la diversité des profils dans un ensemble de 229\,000 exemples. Le recall acceptable (0.56–0.68) indique que le modèle identifie une part raisonnable des cas positifs. Le F1-Score moyen autour de 0.48 reflète cet équilibre imparfait.
+
+% -----------------------------------------------------------------------
+
+\section{Problèmes Rencontrés et Solutions Proposées}
+
+\textbf{Classification avec GaussianLikelihood.} La \texttt{GaussianLikelihood} de GPyTorch est conçue pour la régression. Pour l'adapter à la classification binaire, un seuil de décision est optimisé par client sur un ensemble de validation local en maximisant le F1-Score. Cette approche est non conventionnelle mais s'est révélée fonctionnelle sur les trois datasets.
+
+\textbf{Déséquilibre de classes.} Les trois datasets présentent une proportion nettement inférieure de cas diabétiques. L'optimisation du seuil de décision atténue partiellement cet effet, mais le recall reste limité, notamment sur DPD et BRFSS.
+
+\textbf{Scalabilité.} ExactGP a une complexité en $\mathcal{O}(n^3)$, inutilisable sur de grands datasets. Pour DPD et BRFSS, des modèles SparseGP avec 100 points inducteurs ont été utilisés, réduisant la complexité à $\mathcal{O}(nm^2)$ avec $m = 100 \ll n$. Les points inducteurs sont initialisés par k-means sur les données locales de chaque client.
+
+\textbf{Dimensionnalité du BRFSS.} Les 22 features initiales ont été réduites à 8 par sélection par corrélation avec la variable cible. Le noyau Matérn avec ARD permet au modèle d'apprendre automatiquement l'importance relative de chaque feature.
+
+% -----------------------------------------------------------------------
+
+\section{Mesures / Paramètres d'Analyse des Performances / Méthodes d'Evaluation Utilisés pour la Vérification des Résultats}
+
+Quatre métriques standard ont été utilisées pour évaluer les performances du système :
+
+\begin{itemize}
+  \item \textbf{Accuracy} : proportion d'exemples correctement classifiés. Peu fiable en présence de classes déséquilibrées.
+  \item \textbf{Precision} : parmi les exemples prédits positifs, proportion de vrais positifs.
+  \item \textbf{Recall} : parmi les exemples réellement positifs, proportion correctement détectés. Métrique critique en contexte médical.
+  \item \textbf{F1-Score} : moyenne harmonique de la precision et du recall :
+\end{itemize}
+
+\begin{equation}
+F_1 = 2 \cdot \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+Le F1-Score est la métrique principale retenue dans ce projet, car il pénalise à la fois les faux positifs et les faux négatifs, offrant un indicateur équilibré adapté aux datasets déséquilibrés. Les métriques reportées sont calculées par cluster et moyennées sur l'ensemble des clients du cluster correspondant.
+
+Ces mêmes métriques ont également été utilisées pour comparer les résultats obtenus avec différents algorithmes appliqués sur les mêmes datasets et avec la même méthode d'apprentissage fédéré clustérisé. Cette comparaison permet d'évaluer l'apport spécifique des Processus Gaussiens par rapport à d'autres approches testées dans le même cadre expérimental.
+
+% -----------------------------------------------------------------------
+
+\section{Comparaison avec les Modèles de Référence (LR et RFC)}
+
+Les résultats du GP fédéré clustérisé sont comparés aux performances des modèles de référence issus de Bahar \& Pinarer (2024), conduite dans le même cadre expérimental : même schéma d'apprentissage fédéré clustérisé par feature, mêmes datasets. Les deux modèles de référence sont la Régression Logistique (LR) et le Classificateur Forêt Aléatoire (RFC). Le F1-Score est retenu comme métrique de comparaison principale.
+
+\subsubsection*{Dataset 1 — DPD}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison des F1-Scores agrégés — Dataset DPD}
+\label{tab:comparison_dpd}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{GP-FL} & \textbf{LR-FL} & \textbf{RFC-FL} \\
+\hline
+gender               & \textbf{0.7257} & 0.7256 & 0.8027 \\
+age                  & 0.6799          & 0.7289 & \textbf{0.8044} \\
+hypertension         & \textbf{0.7337} & 0.7197 & 0.8052 \\
+heart\_disease        & \textbf{0.7338} & 0.7174 & 0.8026 \\
+bmi                  & 0.7078          & 0.7180 & \textbf{0.8032} \\
+HbA1c\_level         & \textbf{0.7231} & 0.6618 & 0.7780 \\
+blood\_glucose\_level & 0.6904         & \textbf{0.7231} & 0.7835 \\
+\hline
+\end{tabular}
+\end{table}
+
+Sur le DPD, le GP-FL se situe entre LR et RFC. Il surpasse LR sur les features médicalement significatives (\texttt{hypertension}, \texttt{heart\_disease}, \texttt{HbA1c\_level}), ce qui est cohérent avec l'avantage du GP à capturer des relations non-linéaires dans des sous-groupes bien définis. Le RFC reste supérieur sur l'ensemble des features, principalement grâce à sa gestion plus efficace du déséquilibre de classes par les arbres de décision. Cependant, le RFC ne fournit aucune estimation d'incertitude (voir section~\ref{sec:uncertainty}).
+
+\subsubsection*{Dataset 2 — Pima Indian}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison des F1-Scores agrégés — Dataset Pima Indian}
+\label{tab:comparison_pima}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{GP-FL} & \textbf{LR-FL} & \textbf{RFC-FL} \\
+\hline
+Pregnancies       & \textbf{0.7402} & 0.6435 & 0.6435 \\
+Glucose           & \textbf{0.6981} & 0.6170 & 0.2500 \\
+BloodPressure     & \textbf{0.7132} & 0.6600 & 0.7000 \\
+SkinThickness     & \textbf{0.7442} & 0.6905 & 0.6389 \\
+Insulin           & \textbf{0.6957} & 0.6531 & 0.5581 \\
+BMI               & \textbf{0.6897} & 0.6142 & 0.4000 \\
+DiabetesPedigree  & \textbf{0.6726} & 0.6549 & 0.6500 \\
+Age               & \textbf{0.7018} & 0.6393 & 0.6316 \\
+\hline
+\end{tabular}
+\end{table}
+
+Le GP-FL obtient le meilleur F1-Score sur \textit{toutes} les features du Dataset Pima Indian. L'avantage est particulièrement marqué sur \texttt{Glucose} (GP\,: 0.698 vs RFC\,: 0.250) et \texttt{BMI} (GP\,: 0.690 vs RFC\,: 0.400), où le RFC souffre de forts déséquilibres dans les clusters locaux issus d'un dataset de petite taille. Ce résultat illustre la robustesse de l'ExactGP dans les régimes à données limitées, où les propriétés bayésiennes du GP permettent une meilleure généralisation que les méthodes discriminatives classiques.
+
+\subsubsection*{Dataset 3 — BRFSS}
+
+Une comparaison directe avec les résultats de Bahar \& Pinarer est rendue difficile par une différence méthodologique importante : l'étude de référence utilise la version \textit{équilibrée} du dataset BRFSS (70\,692 exemples), tandis que nos expériences ont été conduites sur la version complète non-équilibrée (229\,000 exemples). Le fort déséquilibre de classes dans notre version pénalise directement la précision et le F1-Score du GP, ce qui explique l'écart observé entre les deux études sur ce dataset.
+
+% -----------------------------------------------------------------------
+
+\section{Analyse de l'Incertitude Prédictive}
+\label{sec:uncertainty}
+
+L'un des avantages fondamentaux des Processus Gaussiens par rapport aux modèles de référence est leur capacité à quantifier l'incertitude associée à chaque prédiction. Pour chaque exemple $x$, le GP calcule une probabilité prédictive $p(x)$ dont la variance aléatoire est approximée par $\sigma(x) = \sqrt{p(x)(1-p(x))}$. Cette mesure atteint son maximum de $0.5$ lorsque $p(x) = 0.5$ (incertitude maximale) et tend vers $0$ pour des prédictions proches de $0$ ou $1$ (haute confiance).
+
+\subsubsection*{Dataset 1 — DPD : incertitude calibrée}
+
+Sur le DPD, le GP produit une incertitude bien calibrée. Le tableau~\ref{tab:uncertainty_dpd} montre l'impact du filtrage par confiance : en rejetant les prédictions les plus incertaines (couverture $\approx 60$--$87$\%), le F1-Score s'améliore très significativement sur toutes les features.
+
+\begin{table}[H]
+\centering
+\caption{Analyse d'incertitude — Dataset DPD (seuil de rejet de 50\%)}
+\label{tab:uncertainty_dpd}
+\small
+\begin{tabular}{p{3.2cm}p{1.8cm}p{1.8cm}p{1.8cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Couverture} & \textbf{F1 (tous)} & \textbf{F1 (confiant)} & \textbf{$\sigma_{\text{correct}}$ / $\sigma_{\text{incorrect}}$} \\
+\hline
+gender           & 62.6\% & 0.60 & \textbf{0.94} & 0.194 / 0.436 \\
+age              & 60.6\% & 0.55 & \textbf{0.90} & 0.319 / 0.462 \\
+hypertension     & 86.4\% & 0.71 & \textbf{0.77} & 0.088 / 0.382 \\
+heart\_disease    & 82.7\% & 0.70 & \textbf{0.83} & 0.081 / 0.384 \\
+smoking\_history & 62.9\% & 0.60 & \textbf{0.90} & 0.182 / 0.435 \\
+bmi              & 74.5\% & 0.66 & \textbf{0.88} & 0.129 / 0.408 \\
+HbA1c\_level     & 56.6\% & 0.66 & \textbf{0.93} & 0.200 / 0.437 \\
+\hline
+\end{tabular}
+\end{table}
+
+Deux observations importantes ressortent. Premièrement, le ratio $\sigma_{\text{incorrect}} / \sigma_{\text{correct}}$ est systématiquement supérieur à 1 sur toutes les features : le GP est plus incertain sur ses erreurs que sur ses prédictions correctes. Par exemple, pour \texttt{gender}, l'incertitude moyenne sur les prédictions erronées ($\sigma = 0.436$) est $\textbf{2.25}\times$ supérieure à celle des prédictions correctes ($\sigma = 0.194$). Cela valide la calibration de l'incertitude.
+
+Deuxièmement, la stratification du risque révèle une séparation cliniquement pertinente : le groupe \textit{Confident Diabetic} ($p > 0.7$, $\sigma$ faible) présente un taux de diabète réel de 95--100\%, tandis que le groupe \textit{Confident Healthy} affiche un taux réel inférieur à 1\%. Les cas incertains (~50\% des exemples) correspondent à des profils mixtes où le taux de diabète réel varie entre 10\% et 20\%.
+
+\subsubsection*{Datasets 2 et 3 : régime haute incertitude}
+
+Sur le Dataset Pima Indian et BRFSS, le GP opère dans un régime de haute incertitude ($\sigma \approx 0.49$ pour la majorité des exemples), proche du maximum théorique. Pour le Dataset Pima Indian, cela s'explique par la taille réduite du dataset (769 exemples) : avec peu d'observations par cluster, le GP ne peut pas construire une distribution postérieure suffisamment informative pour distinguer les cas certains des cas incertains. Pour le BRFSS (229\,000 exemples non-équilibrés), la forte imbalance et la faible séparabilité linéaire des features retenues produisent un comportement similaire.
+
+Ce comportement est en lui-même une information cliniquement utile : un GP indiquant une incertitude maximale signale explicitement que les données disponibles ne permettent pas de prédiction fiable dans ce régime, contrairement à un RFC qui délivrerait une prédiction ponctuelle sans signal d'alerte. Un praticien peut ainsi savoir quels patients nécessitent des examens complémentaires plutôt que de s'appuyer sur une prédiction potentiellement non fiable.
+
+\end{document}

@@ -54,8 +54,8 @@ def plot_confusion_matrix(client, feature_name, output_dir):
     
     plt.figure(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=['No Diabetes (0)', 'Diabetes (1)'],
-                yticklabels=['No Diabetes (0)', 'Diabetes (1)'])
+                xticklabels=['No Diabetes', 'Diabetes'],
+                yticklabels=['No Diabetes', 'Diabetes'])
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
     plt.title(f'{feature_name} - Client {client.id}\nConfusion Matrix (Threshold: {partition_thresh:.2f})')

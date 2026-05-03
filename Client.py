@@ -63,7 +63,7 @@ class Client:
         try:
             df = pd.read_csv(csv_path)
         except Exception as e:
-            print(f"❌ Client {self.id}: Dosya okunamadı! Hata: {e}")
+            print(f"Client {self.id}: Dosya okunamadı! Hata: {e}")
             return
 
         target_map = {
@@ -74,7 +74,7 @@ class Client:
         df = df.rename(columns=target_map)
 
         if "diabetes" not in df.columns:
-            print(f"⚠️ Client {self.id}: 'diabetes' sütunu yok.")
+            print(f"Client {self.id}: 'diabetes' sütunu yok.")
             return
 
         y = df["diabetes"]
@@ -85,12 +85,12 @@ class Client:
               f"pozitif={pos_rate:.1%}  negatif={(1-pos_rate):.1%}  (n={len(y)})")
 
         if len(df) < MIN_CLUSTER_SIZE:
-            print(f"⚠️ Client {self.id}: Veri sayısı çok az ({len(df)} < {MIN_CLUSTER_SIZE}), atlanıyor.")
+            print(f"Client {self.id}: Veri sayısı çok az ({len(df)} < {MIN_CLUSTER_SIZE}), atlanıyor.")
             return
 
         n_pos = int(y.sum())
         if n_pos < MIN_POSITIVE_SAMPLES:
-            print(f"⚠️ Client {self.id}: Pozitif örnek çok az ({n_pos} < {MIN_POSITIVE_SAMPLES}), "
+            print(f"Client {self.id}: Pozitif örnek çok az ({n_pos} < {MIN_POSITIVE_SAMPLES}), "
                   f"anlamlı sınır öğrenilemez — atlanıyor.")
             return
 
@@ -163,7 +163,7 @@ class Client:
             # outputscale=4 → GP mean ±2 → sigmoid [0.12, 0.88] — prevents collapse to 0.5
             self.model.covar_module.outputscale = torch.tensor(4.0)
             self.model.covar_module.base_kernel.lengthscale = torch.tensor([[0.5]])
-            print(f"🔧 Client {self.id}: SparseGP+Bernoulli+{self.kernel_type} | {actual_num_inducing} inducing")
+            print(f"Client {self.id}: SparseGP+Bernoulli+{self.kernel_type} | {actual_num_inducing} inducing")
 
         self.has_data = True
 
@@ -308,10 +308,6 @@ class Client:
         probs = self._get_probs(self.val_x)
         labels = self.val_y.numpy()
 
-        # DEBUG — model gerçekten bir şey öğrenmiş mi?
-        print(f"  [DEBUG] Probs  min={probs.min():.4f}  max={probs.max():.4f}  "
-              f"mean={probs.mean():.4f} | labels_pos={labels.mean():.3f}")
-
         # Sadece iki class varsa threshold search yap
         if len(np.unique(labels)) < 2:
             return
@@ -383,7 +379,7 @@ class Client:
         cm = confusion_matrix(y_true, y_hard)
 
         if verbose:
-            print(f"\n📊 Client {self.id} Evaluation (threshold={self.optimal_threshold:.2f}):")
+            print(f"\n Client {self.id} Evaluation (threshold={self.optimal_threshold:.2f}):")
             print(f"  Accuracy  : {acc:.4f}")
             print(f"  F1 Score  : {f1:.4f}")
             print(f"  Precision : {prec:.4f}")
@@ -420,8 +416,6 @@ class Client:
         # Verify what was actually set (constraint may clip the value)
         actual_ls = self.model.covar_module.base_kernel.lengthscale.item()
         actual_os = self.model.covar_module.outputscale.item()
-        print(f"  [FL] Client {self.id} ← global: os={actual_os:.4f}  ls={actual_ls:.4f}  "
-              f"mean={new_mean_constant:.4f}  (requested ls={new_length_scale:.4f})")
 
         if self.model_type == "small":
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
@@ -445,5 +439,4 @@ class Client:
         return output_scale, length_scale, mean_constant
 
     def test_global_model(self):
-        """Geriye dönük uyumluluk için — artık classification metrikleri döndürüyor."""
         return self.evaluate()

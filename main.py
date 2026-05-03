@@ -241,9 +241,9 @@ if __name__ == "__main__":
                 result_text = run_experiment(feature)
                 f.write(result_text)
                 f.flush()
-                print(f"✅ {feature} completed.")
+                print(f"{feature} completed.")
             except Exception as e:
-                print(f"❌ Error {feature}: {e}")
+                print(f"Error {feature}: {e}")
 
     generate_paper_style_table(all_results_for_table, paper_table_file, gp_fl_global_results)
     generate_all_comparisons(gp_fl_results, gp_fl_local_results, plots_dir)

@@ -2,15 +2,14 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("dataset_3/diabetes_3.csv")
+df = pd.read_csv("dataset_3/diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
 
 corr_matrix = df.corr(numeric_only=True)
 
-# Get correlation with target variable (Diabetes_binary)
 target_corr = corr_matrix["Diabetes_binary"].drop("Diabetes_binary")
 
 # Filter features with correlation > 0.15 with target
-selected_features = target_corr[abs(target_corr) > 0.15]
+selected_features = target_corr[abs(target_corr) > 0.20]
 
 print("\nFeatures with correlation > 0.15 with Diabetes_binary:")
 print("="*55)

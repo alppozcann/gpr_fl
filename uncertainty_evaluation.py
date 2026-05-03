@@ -317,17 +317,6 @@ def generate_uncertainty_report(all_uncertainty_results, output_file):
     with open(output_file, 'w') as f:
         f.write("=" * 100 + "\n")
         f.write("GP-FL UNCERTAINTY ANALYSIS REPORT\n")
-        f.write("Showcasing Gaussian Process's Unique Capability: Prediction Uncertainty\n")
-        f.write("=" * 100 + "\n\n")
-        
-        f.write("WHY THIS MATTERS:\n")
-        f.write("-" * 50 + "\n")
-        f.write("Traditional classifiers (LR, RFC) output only point predictions.\n")
-        f.write("GP provides UNCERTAINTY estimates, enabling:\n")
-        f.write("  1. Risk stratification (Low/Medium/High confidence)\n")
-        f.write("  2. Flagging uncertain cases for human review\n")
-        f.write("  3. Confidence-filtered predictions with higher accuracy\n")
-        f.write("  4. Better clinical decision support\n\n")
         
         # Summary table
         f.write("=" * 100 + "\n")
@@ -386,7 +375,7 @@ def generate_uncertainty_report(all_uncertainty_results, output_file):
         f.write("\nThis capability is UNIQUE to Gaussian Processes and unavailable in RFC/LR.\n")
         f.write("=" * 100 + "\n")
     
-    print(f"📄 Uncertainty report saved to: {output_file}")
+    print(f"Uncertainty report saved to: {output_file}")
 
 
 def get_global_uncertainty_metrics(clients, threshold=None):

@@ -1,0 +1,155 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Rapport Intermédiaire\\
+\large Apprentissage Fédéré Clustérisé avec Processus Gaussiens\\
+pour la Prédiction du Diabète}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+% -----------------------------------------------------------------------
+
+\subsection{Premiers résultats obtenus}
+
+Cette section présente les résultats expérimentaux initiaux obtenus sur les trois datasets utilisés dans ce projet. Pour chaque dataset, le système d'apprentissage fédéré a été évalué en mode clustering par feature : chaque client correspond à un sous-groupe défini par une feature spécifique, et les hyperparamètres du kernel sont agrégés par moyenne pondérée entre les clients à chaque round de fédération. Les métriques rapportées sont des moyennes sur l'ensemble des clients d'un même cluster.
+
+\subsubsection*{Dataset 1 — DPD (SparseGP, noyau RBF, 100 points inducteurs)}
+
+Le dataset DPD contient environ 100\,000 exemples. En raison de cette taille, un modèle SparseGP avec 100 points inducteurs a été utilisé. Le clustering est réalisé par feature, et les résultats moyens par feature sont présentés dans le tableau~\ref{tab:dpd_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset DPD (SparseGP, RBF)}
+\label{tab:dpd_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+gender               & 0.9591 & 0.8277 & 0.6461 & 0.7257 \\
+age                  & 0.9565 & 0.8842 & 0.5523 & 0.6799 \\
+hypertension         & 0.9594 & 0.8087 & 0.6715 & 0.7337 \\
+heart\_disease        & 0.9593 & 0.8101 & 0.6707 & 0.7338 \\
+smoking\_history     & 0.9601 & 0.8168 & 0.6713 & 0.7369 \\
+bmi                  & 0.9560 & 0.7963 & 0.6370 & 0.7078 \\
+HbA1c\_level         & 0.9629 & 0.9473 & 0.5847 & 0.7231 \\
+blood\_glucose\_level & 0.9604 & 0.9800 & 0.5329 & 0.6904 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection*{Dataset 2 — Pima Indian (ExactGP, noyau RBF)}
+
+Le dataset Pima Indian contient 769 exemples, ce qui permet d'utiliser un modèle ExactGP sans approximation. Les résultats par feature sont donnés dans le tableau~\ref{tab:pima_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset Pima Indian (ExactGP, RBF)}
+\label{tab:pima_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+Pregnancies       & 0.7871 & 0.6528 & 0.8545 & 0.7402 \\
+Glucose           & 0.7895 & 0.6852 & 0.7115 & 0.6981 \\
+BloodPressure     & 0.7597 & 0.6389 & 0.8070 & 0.7132 \\
+SkinThickness     & 0.7885 & 0.6575 & 0.8571 & 0.7442 \\
+Insulin           & 0.7727 & 0.6780 & 0.7143 & 0.6957 \\
+BMI               & 0.7632 & 0.6452 & 0.7407 & 0.6897 \\
+DiabetesPedigree  & 0.7597 & 0.6909 & 0.6552 & 0.6726 \\
+Age               & 0.7806 & 0.7143 & 0.6897 & 0.7018 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection*{Dataset 3 — BRFSS (SparseGP, noyau Matérn + ARD, 100 points inducteurs)}
+
+Le dataset BRFSS contient environ 229\,000 exemples et 22 features initiales réduites à 8 par sélection par corrélation. Un modèle SparseGP avec noyau Matérn et ARD (\textit{Automatic Relevance Determination}) a été utilisé. Les résultats sont présentés dans le tableau~\ref{tab:brfss_results}.
+
+\begin{table}[H]
+\centering
+\caption{Résultats moyens par feature — Dataset BRFSS (SparseGP, Matérn + ARD)}
+\label{tab:brfss_results}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\hline
+\textbf{Feature} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\hline
+HighBP                & 0.7780 & 0.4110 & 0.5637 & 0.4754 \\
+HighChol              & 0.7487 & 0.3834 & 0.6707 & 0.4879 \\
+BMI                   & 0.7694 & 0.4019 & 0.6035 & 0.4825 \\
+HeartDiseaseorAttack  & 0.7519 & 0.3834 & 0.6433 & 0.4805 \\
+GenHlth               & 0.7390 & 0.3630 & 0.6843 & 0.4744 \\
+PhysHlth              & 0.7754 & 0.4099 & 0.6123 & 0.4911 \\
+DiffWalk              & 0.7759 & 0.4072 & 0.5816 & 0.4790 \\
+Age                   & 0.7610 & 0.4010 & 0.6462 & 0.4948 \\
+\hline
+\end{tabular}
+\end{table}
+
+% -----------------------------------------------------------------------
+
+\subsection{Analyse et validation des premiers résultats}
+
+\subsubsection*{Dataset DPD}
+
+Les résultats obtenus sur DPD montrent une accuracy très élevée, supérieure à 0.95 pour toutes les features. Cette valeur peut paraître flatteuse, mais elle s'explique en grande partie par le déséquilibre de classes présent dans ce dataset : la proportion de cas diabétiques est nettement minoritaire, ce qui signifie qu'un modèle qui prédit majoritairement la classe non-diabétique obtient mécaniquement une accuracy élevée. Cela se confirme par les valeurs de recall, qui restent modérées (entre 0.53 et 0.67 selon la feature), indiquant que le modèle ne détecte pas tous les cas positifs.
+
+On note cependant que les features \texttt{HbA1c\_level} et \texttt{blood\_glucose\_level} se distinguent avec des valeurs de precision particulièrement élevées (respectivement 0.9473 et 0.9800). Ces deux features sont médicalement reconnues comme des marqueurs directs du diabète, ce qui valide la pertinence du clustering par feature : les clients regroupés autour de ces variables disposent d'un signal plus informatif, ce qui améliore la qualité des prédictions positives.
+
+\subsubsection*{Dataset Pima Indian}
+
+Les performances sur Pima Indian sont plus modestes, avec une accuracy comprise entre 0.76 et 0.79. Ce niveau est cohérent avec la taille très limitée du dataset (769 exemples au total), qui contraint la capacité de généralisation du modèle. Malgré cela, le recall est particulièrement élevé pour plusieurs features : \texttt{BloodPressure} atteint 0.8070, \texttt{SkinThickness} 0.8571 et \texttt{Pregnancies} 0.8545. Ces valeurs indiquent que le modèle est capable de détecter une grande partie des cas diabétiques réels, ce qui est une propriété importante dans un contexte médical où les faux négatifs sont coûteux.
+
+Le F1-Score, qui combine precision et recall, se situe autour de 0.70 pour la majorité des features, ce qui constitue un résultat satisfaisant compte tenu du faible volume de données disponibles.
+
+\subsubsection*{Dataset BRFSS}
+
+Le dataset BRFSS présente le cas le plus difficile. L'accuracy avoisine 0.75, mais la precision reste très faible, entre 0.36 et 0.41 selon la feature. Cela signifie que parmi les exemples prédits comme diabétiques, une grande proportion est incorrecte. Plusieurs facteurs expliquent cette difficulté : le déséquilibre de classes est plus marqué que sur les autres datasets, la réduction de 22 à 8 features par sélection par corrélation a pu éliminer des variables utiles pour discriminer les cas positifs, et la grande diversité des profils de patients dans un dataset de 229\,000 exemples rend la tâche plus complexe.
+
+Le recall reste néanmoins acceptable (entre 0.56 et 0.68), ce qui indique que le modèle identifie une part raisonnable des cas positifs, même si cela se fait au prix de nombreux faux positifs. Le F1-Score moyen autour de 0.48 reflète cet équilibre imparfait entre precision et recall.
+
+\subsubsection*{Remarque sur l'approche GaussianLikelihood}
+
+L'utilisation d'une \texttt{GaussianLikelihood} (conçue pour la régression) sur des labels binaires est une approche non conventionnelle pour un problème de classification. Elle a été retenue ici pour sa simplicité d'implémentation et sa compatibilité avec le cadre d'agrégation des hyperparamètres du kernel. Les prédictions continues produites par le modèle sont binarisées via un seuil de décision optimisé par client sur un ensemble de validation local. Malgré son caractère atypique, cette approche donne des résultats raisonnables sur les trois datasets, ce qui valide sa faisabilité dans le contexte de l'apprentissage fédéré.
+
+% -----------------------------------------------------------------------
+
+\subsection{Problèmes rencontrés et solutions}
+
+Le premier problème majeur rencontré concerne l'inadéquation entre le type de modèle et la nature du problème. La \texttt{GaussianLikelihood} de GPyTorch est conçue pour des tâches de régression et produit des prédictions continues, alors que notre problème est une classification binaire. Pour contourner cette limitation sans changer de likelihood, nous avons mis en place une procédure d'optimisation du seuil de décision par client : après l'entraînement, chaque client détermine le seuil optimal sur ses données de validation locales en maximisant le F1-Score. Cette approche permet d'adapter le comportement du modèle à la distribution locale de chaque client sans modifier l'architecture fédérée.
+
+Un deuxième problème est lié au déséquilibre de classes présent dans les trois datasets. Dans DPD et BRFSS notamment, la proportion de patients diabétiques est nettement inférieure à celle des non-diabétiques. Ce déséquilibre se traduit par un recall réduit sur la classe minoritaire, le modèle ayant tendance à prédire la classe majoritaire de façon systématique pour minimiser la perte. À ce stade du projet, ce problème n'a pas encore été entièrement résolu : l'optimisation du seuil de décision atténue partiellement l'effet du déséquilibre, mais des techniques complémentaires comme le rééchantillonnage ou une pondération des classes dans la fonction de perte sont envisagées pour les prochaines itérations.
+
+La scalabilité a constitué un troisième défi technique. Le modèle ExactGP a une complexité temporelle en $\mathcal{O}(n^3)$, ce qui le rend inutilisable sur des datasets de grande taille. Pour DPD (environ 100\,000 exemples) et BRFSS (environ 229\,000 exemples), nous avons utilisé des modèles SparseGP avec 100 points inducteurs (\textit{inducing points}), qui permettent de réduire la complexité à $\mathcal{O}(nm^2)$ où $m = 100 \ll n$. Les points inducteurs sont initialisés par k-means sur les données d'entraînement de chaque client, ce qui assure une bonne couverture de l'espace des features.
+
+Enfin, la dimensionnalité du dataset BRFSS a posé un problème spécifique. Avec 22 features initiales, le coût de calcul et le risque de sur-apprentissage étaient élevés. Nous avons effectué une sélection de features basée sur la corrélation avec la variable cible, en retenant les 8 features les plus corrélées. Le noyau Matérn combiné à l'ARD (\textit{Automatic Relevance Determination}) a également été introduit pour permettre au modèle d'apprendre automatiquement l'importance relative de chaque feature, offrant ainsi une forme de sélection implicite des variables les plus pertinentes.
+
+% -----------------------------------------------------------------------
+
+\subsection{Métriques et méthodes d'évaluation}
+
+Pour évaluer les performances du système d'apprentissage fédéré, quatre métriques de classification standard ont été utilisées. L'\textbf{accuracy} mesure la proportion d'exemples correctement classifiés parmi l'ensemble des exemples ; c'est la métrique la plus intuitive, mais elle est insuffisante en présence de classes déséquilibrées car elle peut masquer de mauvaises performances sur la classe minoritaire. La \textbf{precision} mesure, parmi les exemples prédits comme positifs (diabétiques), la proportion de vrais positifs ; une precision faible signifie beaucoup de faux positifs. Le \textbf{recall} (ou sensibilité) mesure, parmi les exemples réellement positifs, la proportion correctement détectés ; un recall faible signifie que le modèle rate beaucoup de cas diabétiques réels, ce qui est problématique dans un contexte médical. Le \textbf{F1-Score} est la moyenne harmonique de la precision et du recall, définie par :
+
+\begin{equation}
+F_1 = 2 \cdot \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+Le F1-Score est la métrique principale retenue dans ce projet pour comparer les résultats entre datasets et entre features. En effet, les trois datasets présentent des déséquilibres de classes plus ou moins marqués, ce qui rend l'accuracy peu fiable comme indicateur global de performance. Le F1-Score pénalise à la fois les modèles qui produisent trop de faux positifs (precision faible) et ceux qui ratent trop de vrais positifs (recall faible), offrant ainsi un compromis équilibré adapté à notre problème.
+
+Les métriques reportées dans les tableaux de la section précédente sont calculées au niveau de chaque cluster, puis moyennées sur l'ensemble des clients du cluster correspondant. Une analyse plus fine des résultats cluster par cluster, montrant la distribution des performances selon les sous-groupes identifiés par le clustering médical ou k-means, est disponible en annexe. Cette analyse détaillée permet d'identifier les clusters pour lesquels le modèle fédéré converge bien et ceux qui présentent encore des difficultés, notamment sur les datasets BRFSS et DPD où le déséquilibre de classes est le plus prononcé.
+
+\end{document}
