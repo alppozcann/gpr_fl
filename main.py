@@ -12,7 +12,7 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # =====================================================
 # CONFIGURATION
 # =====================================================
-DATASET_NUMBER = 1
+DATASET_NUMBER = 3
 
 DATASET_CONFIGS = {
     # Dataset 1: 100k rows — SVGP, Matérn 2.5, Bernoulli(MC), no standardization, oversampling ON
@@ -31,13 +31,14 @@ DATASET_CONFIGS = {
         "NUM_FL_ROUNDS": 7,
         "LOCAL_EPOCHS_PER_ROUND": 80,
     },
-    # Dataset 3: 229k rows (BRFSS survey) — SVGP, Matérn 2.5, Bernoulli(MC), standardization ON, oversampling ON, 8 features specified from the co
+    # Dataset 3: 70k rows (BRFSS 50/50 split) — SVGP, Matérn 2.5, Gaussian(Regression), standardization ON, 8 features
     3: {
         "NUM_INDUCING_POINTS": 1000,
         "KERNEL_TYPE": "matern",
         "STANDARDIZE": True,
         "NUM_FL_ROUNDS": 5,
         "LOCAL_EPOCHS_PER_ROUND": 100,
+        "GP_TASK": "regression",
     },
 }
 
@@ -47,8 +48,13 @@ KERNEL_TYPE            = _cfg["KERNEL_TYPE"]
 STANDARDIZE            = _cfg["STANDARDIZE"]
 NUM_FL_ROUNDS          = _cfg["NUM_FL_ROUNDS"]
 LOCAL_EPOCHS_PER_ROUND = _cfg["LOCAL_EPOCHS_PER_ROUND"]
-DATASET = f"dataset_{DATASET_NUMBER}/"
-DATA_TABLE = f"diabetes_{DATASET_NUMBER}.csv"
+GP_TASK                = _cfg.get("GP_TASK", "classification")
+if DATASET_NUMBER == 3:
+    DATASET = "dataset_3/"
+    DATA_TABLE = "diabetes_binary_5050split_health_indicators_BRFSS2015.csv"
+else:
+    DATASET = f"dataset_{DATASET_NUMBER}/"
+    DATA_TABLE = f"diabetes_{DATASET_NUMBER}.csv"
 csv_file = os.path.join(DATASET, DATA_TABLE)
 
 
@@ -64,9 +70,10 @@ else:
     del _temp_df  # Clean up
 
 
-# Output paths
-output_file = os.path.join(DATASET, "results.txt")
-paper_table_file = os.path.join(DATASET, "paper_style_results.txt")
+# Output paths — suffixed by task so classification and regression results don't overwrite each other
+_task_suffix = f"_{GP_TASK}" if GP_TASK != "classification" else ""
+output_file = os.path.join(DATASET, f"results{_task_suffix}.txt")
+paper_table_file = os.path.join(DATASET, f"paper_style_results{_task_suffix}.txt")
 plots_dir = os.path.join(DATASET, "plots")
 os.makedirs(plots_dir, exist_ok=True)
 
@@ -119,7 +126,7 @@ def run_experiment(feature_name):
         
         client = Client(client_id=i+1, csv_path=temp_csv,
                        num_inducing_points=NUM_INDUCING_POINTS, expected_columns=expected_columns,
-                       kernel_type=KERNEL_TYPE, standardize=STANDARDIZE)
+                       kernel_type=KERNEL_TYPE, standardize=STANDARDIZE, task=GP_TASK)
         if client.has_data:
             clients.append(client)
             client_sizes.append(len(client.train_x))
@@ -132,8 +139,6 @@ def run_experiment(feature_name):
         return f"\n{feature_name}: Not enough valid clients (need >= 2)\n"
     
     # Federated Learning — NUM_FL_ROUNDS rounds
-    MIN_POS_RATIO = 0.10  # clients below this threshold are excluded from aggregation
-
     for fl_round in range(NUM_FL_ROUNDS):
         print(f"\n--- FL Round {fl_round + 1}/{NUM_FL_ROUNDS} ({feature_name}) ---")
         client_updates = []
@@ -141,12 +146,6 @@ def run_experiment(feature_name):
 
         for client, size in zip(clients, client_sizes):
             client.train_local(training_iter=LOCAL_EPOCHS_PER_ROUND)
-
-            pos_ratio = client.train_y.mean().item()
-            if pos_ratio < MIN_POS_RATIO:
-                print(f"  [SKIP] Client {client.id} excluded from {feature_name} FL: "
-                      f"pos_ratio={pos_ratio:.3f} < threshold={MIN_POS_RATIO}")
-                continue
 
             params = client.send_params()
             if params is not None:
@@ -249,5 +248,5 @@ if __name__ == "__main__":
     generate_all_comparisons(gp_fl_results, gp_fl_local_results, plots_dir)
     
     # Generate uncertainty report (GP's unique power!)
-    uncertainty_report_file = os.path.join(DATASET, "uncertainty_report.txt")
+    uncertainty_report_file = os.path.join(DATASET, f"uncertainty_report{_task_suffix}.txt")
     generate_uncertainty_report(all_uncertainty_results, uncertainty_report_file)
