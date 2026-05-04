@@ -1,0 +1,222 @@
+====================================================================================================
+GP-FL UNCERTAINTY ANALYSIS REPORT
+====================================================================================================
+Feature                   Coverage     Acc (All)    Acc (Conf)   F1 (All)     F1 (Conf)    Uncertain % 
+====================================================================================================
+gender                    72.9         0.9603       0.9973       0.6898       0.9464       50.0        
+age                       88.8         0.9543       0.9844       0.6385       0.8125       50.0        
+hypertension              75.4         0.9558       0.9952       0.6514       0.9321       100.0       
+heart_disease             75.6         0.9506       0.9961       0.6079       0.9521       100.0       
+smoking_history           65.9         0.9576       0.9967       0.6693       0.9467       50.0        
+bmi                       68.7         0.9564       0.9951       0.6618       0.9096       100.0       
+HbA1c_level               58.6         0.9237       0.9726       0.6112       0.6951       100.0       
+====================================================================================================
+
+
+================================================================================
+FEATURE: gender
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1583
+  Median σ: 0.1355
+  σ for correct predictions: 0.1474
+  σ for incorrect predictions: 0.4211
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 9653 (48.3%)
+    → Actual diabetes rate: 0.1%
+  Uncertain (Needs Review): 9999 (50.0%)
+    → Actual diabetes rate: 12.9%
+  High Risk (Confident Diabetic): 345 (1.7%)
+    → Actual diabetes rate: 100.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9603       0.9671       0.5361       0.6898      
+  10           94.9         0.9779       1.0000       0.6283       0.7717      
+  20           89.4         0.9862       1.0000       0.7280       0.8426      
+  30           83.7         0.9929       1.0000       0.8268       0.9052      
+  40           77.8         0.9956       1.0000       0.8428       0.9147      
+  50           72.9         0.9973       1.0000       0.8982       0.9464      
+
+================================================================================
+FEATURE: age
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1525
+  Median σ: 0.1061
+  σ for correct predictions: 0.1399
+  σ for incorrect predictions: 0.4136
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 9933 (49.7%)
+    → Actual diabetes rate: 0.3%
+  Uncertain (Needs Review): 10001 (50.0%)
+    → Actual diabetes rate: 16.2%
+  High Risk (Confident Diabetic): 67 (0.3%)
+    → Actual diabetes rate: 100.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9543       0.9938       0.4703       0.6385      
+  10           95.1         0.9740       1.0000       0.5736       0.7291      
+  20           88.8         0.9844       1.0000       0.6842       0.8125      
+  30           79.9         0.9919       1.0000       0.4391       0.6103      
+  40           74.4         0.9946       1.0000       0.4740       0.6432      
+  50           70.7         0.9960       1.0000       0.5440       0.7047      
+
+================================================================================
+FEATURE: hypertension
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1174
+  Median σ: 0.0000
+  σ for correct predictions: 0.1037
+  σ for incorrect predictions: 0.4154
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+  Uncertain (Needs Review): 20000 (100.0%)
+    → Actual diabetes rate: 8.5%
+  High Risk (Confident Diabetic): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9558       0.9845       0.4867       0.6514      
+  10           92.9         0.9781       1.0000       0.5787       0.7331      
+  20           86.4         0.9852       1.0000       0.6759       0.8066      
+  30           82.2         0.9897       1.0000       0.7543       0.8600      
+  40           78.5         0.9932       1.0000       0.8265       0.9050      
+  50           75.4         0.9952       1.0000       0.8728       0.9321      
+
+================================================================================
+FEATURE: heart_disease
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1173
+  Median σ: 0.0000
+  σ for correct predictions: 0.1017
+  σ for incorrect predictions: 0.4175
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+  Uncertain (Needs Review): 20001 (100.0%)
+    → Actual diabetes rate: 8.7%
+  High Risk (Confident Diabetic): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9506       0.9808       0.4405       0.6079      
+  10           95.1         0.9732       1.0000       0.5584       0.7167      
+  20           89.4         0.9831       1.0000       0.6717       0.8036      
+  30           83.8         0.9894       1.0000       0.7748       0.8731      
+  40           79.5         0.9937       1.0000       0.8547       0.9216      
+  50           75.6         0.9961       1.0000       0.9085       0.9521      
+
+================================================================================
+FEATURE: smoking_history
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1732
+  Median σ: 0.1427
+  σ for correct predictions: 0.1624
+  σ for incorrect predictions: 0.4167
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 9648 (48.2%)
+    → Actual diabetes rate: 0.2%
+  Uncertain (Needs Review): 10001 (50.0%)
+    → Actual diabetes rate: 13.1%
+  High Risk (Confident Diabetic): 353 (1.8%)
+    → Actual diabetes rate: 100.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9576       0.9783       0.5086       0.6693      
+  10           94.7         0.9758       1.0000       0.6047       0.7536      
+  20           87.6         0.9852       1.0000       0.6263       0.7702      
+  30           81.4         0.9918       1.0000       0.7500       0.8571      
+  40           75.0         0.9955       1.0000       0.8540       0.9213      
+  50           65.9         0.9967       1.0000       0.8988       0.9467      
+
+================================================================================
+FEATURE: bmi
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1434
+  Median σ: 0.0000
+  σ for correct predictions: 0.1312
+  σ for incorrect predictions: 0.4102
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+  Uncertain (Needs Review): 20003 (100.0%)
+    → Actual diabetes rate: 8.6%
+  High Risk (Confident Diabetic): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9564       1.0000       0.4945       0.6618      
+  10           94.0         0.9752       1.0000       0.5400       0.7013      
+  20           86.9         0.9858       1.0000       0.5927       0.7443      
+  30           79.4         0.9901       1.0000       0.6873       0.8146      
+  40           72.8         0.9935       1.0000       0.7824       0.8779      
+  50           68.7         0.9951       1.0000       0.8342       0.9096      
+
+================================================================================
+FEATURE: HbA1c_level
+================================================================================
+
+Uncertainty Statistics:
+  Mean σ: 0.1873
+  Median σ: 0.0000
+  σ for correct predictions: 0.1720
+  σ for incorrect predictions: 0.3725
+
+Risk Stratification:
+  Low Risk (Confident Healthy): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+  Uncertain (Needs Review): 12430 (100.0%)
+    → Actual diabetes rate: 13.3%
+  High Risk (Confident Diabetic): 0 (0.0%)
+    → Actual diabetes rate: 0.0%
+
+Confidence Filtering Analysis:
+  Confidence   Coverage     Accuracy     Precision    Recall       F1-Score    
+  ------------------------------------------------------------------------
+  0            100.0        0.9237       0.9527       0.4499       0.6112      
+  10           84.2         0.9652       0.9668       0.3956       0.5614      
+  20           63.2         0.9624       0.9790       0.4455       0.6124      
+  30           61.7         0.9662       0.9830       0.4753       0.6408      
+  40           60.1         0.9695       0.9913       0.5022       0.6667      
+  50           58.6         0.9726       0.9913       0.5352       0.6951      
+
+====================================================================================================
+CONCLUSION:
+--------------------------------------------------
+GP-FL provides uncertainty-aware predictions that enable:
+  • Higher accuracy on confident predictions
+  • Identification of uncertain cases for further testing
+  • Risk-based patient stratification
+  • Clinically interpretable confidence levels
+
+This capability is UNIQUE to Gaussian Processes and unavailable in RFC/LR.
+====================================================================================================
