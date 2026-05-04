@@ -1,0 +1,318 @@
+Data Set: dataset_2/diabetes_2.csv
+
+============================================================
+FEATURE: PREGNANCIES | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=78):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5600
+  ROC-AUC     | 0.7821
+  Accuracy    | 0.7179
+  Precision   | 0.6364
+  Recall      | 0.5000
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - Cluster 0 (0.0-4.0) (n=492):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5926
+  ROC-AUC     | 0.7956
+  Accuracy    | 0.7800
+  Precision   | 0.6154
+  Recall      | 0.5714
+----------------------------------------
+Client 2 - Cluster 1 (5.0-17.0) (n=276):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5217
+  ROC-AUC     | 0.7704
+  Accuracy    | 0.6071
+  Precision   | 0.6667
+  Recall      | 0.4286
+----------------------------------------
+
+============================================================
+FEATURE: GLUCOSE | CLUSTERS: 2 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=58):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6462
+  ROC-AUC     | 0.6005
+  Accuracy    | 0.6034
+  Precision   | 0.5833
+  Recall      | 0.7241
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 3 - Pre-diabetes (n=274):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4444
+  ROC-AUC     | 0.5027
+  Accuracy    | 0.4643
+  Precision   | 0.3750
+  Recall      | 0.5455
+----------------------------------------
+Client 4 - Diabetes (n=297):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7895
+  ROC-AUC     | 0.6620
+  Accuracy    | 0.7333
+  Precision   | 0.7500
+  Recall      | 0.8333
+----------------------------------------
+
+============================================================
+FEATURE: BLOODPRESSURE | CLUSTERS: 2 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=68):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5882
+  ROC-AUC     | 0.7622
+  Accuracy    | 0.7941
+  Precision   | 0.6250
+  Recall      | 0.5556
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 2 - Low (n=528):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6154
+  ROC-AUC     | 0.7637
+  Accuracy    | 0.8113
+  Precision   | 0.6667
+  Recall      | 0.5714
+----------------------------------------
+Client 3 - Normal (n=145):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5000
+  ROC-AUC     | 0.7500
+  Accuracy    | 0.7333
+  Precision   | 0.5000
+  Recall      | 0.5000
+----------------------------------------
+
+============================================================
+FEATURE: SKINTHICKNESS | CLUSTERS: 4 | METHOD: K-Means
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=79):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6230
+  ROC-AUC     | 0.7912
+  Accuracy    | 0.7089
+  Precision   | 0.7037
+  Recall      | 0.5588
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - Cluster 0 (37.0-99.0) (n=131):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.3636
+  ROC-AUC     | 0.8750
+  Accuracy    | 0.5000
+  Precision   | 0.6667
+  Recall      | 0.2500
+----------------------------------------
+Client 2 - Cluster 1 (0.0-8.0) (n=231):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7586
+  ROC-AUC     | 0.8571
+  Accuracy    | 0.7083
+  Precision   | 0.7333
+  Recall      | 0.7857
+----------------------------------------
+Client 3 - Cluster 2 (10.0-24.0) (n=180):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.0000
+  ROC-AUC     | nan
+  Accuracy    | 1.0000
+  Precision   | 0.0000
+  Recall      | 0.0000
+----------------------------------------
+Client 4 - Cluster 3 (25.0-36.0) (n=226):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5714
+  ROC-AUC     | 0.7348
+  Accuracy    | 0.6087
+  Precision   | 0.6667
+  Recall      | 0.5000
+----------------------------------------
+
+============================================================
+FEATURE: INSULIN | CLUSTERS: 3 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=78):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6557
+  ROC-AUC     | 0.8075
+  Accuracy    | 0.7308
+  Precision   | 0.7407
+  Recall      | 0.5882
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - No Info (n=374):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6207
+  ROC-AUC     | 0.7478
+  Accuracy    | 0.7105
+  Precision   | 0.6429
+  Recall      | 0.6000
+----------------------------------------
+Client 3 - Normal (n=259):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7059
+  ROC-AUC     | 0.8954
+  Accuracy    | 0.8077
+  Precision   | 0.7500
+  Recall      | 0.6667
+----------------------------------------
+Client 4 - High (n=133):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6667
+  ROC-AUC     | 0.9000
+  Accuracy    | 0.6429
+  Precision   | 1.0000
+  Recall      | 0.5000
+----------------------------------------
+
+============================================================
+FEATURE: BMI | CLUSTERS: 4 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=66):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4681
+  ROC-AUC     | 0.6732
+  Accuracy    | 0.6212
+  Precision   | 0.5000
+  Recall      | 0.4400
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 4 - Overweight (n=179):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4444
+  ROC-AUC     | 0.8889
+  Accuracy    | 0.7222
+  Precision   | 0.3333
+  Recall      | 0.6667
+----------------------------------------
+Client 5 - Obesity I (n=224):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.4000
+  ROC-AUC     | 0.7879
+  Accuracy    | 0.6087
+  Precision   | 1.0000
+  Recall      | 0.2500
+----------------------------------------
+Client 6 - Obesity II (n=150):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5000
+  ROC-AUC     | 0.8000
+  Accuracy    | 0.4667
+  Precision   | 0.3636
+  Recall      | 0.8000
+----------------------------------------
+Client 7 - Obesity III (n=98):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5714
+  ROC-AUC     | 0.8800
+  Accuracy    | 0.7000
+  Precision   | 1.0000
+  Recall      | 0.4000
+----------------------------------------
+
+============================================================
+FEATURE: DIABETESPEDIGREEFUNCTION | CLUSTERS: 2 | METHOD: K-Means
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=78):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7931
+  ROC-AUC     | 0.9029
+  Accuracy    | 0.8462
+  Precision   | 0.7931
+  Recall      | 0.7931
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - Cluster 0 (0.6-2.4) (n=194):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7200
+  ROC-AUC     | 0.6875
+  Accuracy    | 0.6500
+  Precision   | 0.6923
+  Recall      | 0.7500
+----------------------------------------
+Client 2 - Cluster 1 (0.1-0.6) (n=574):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.8485
+  ROC-AUC     | 0.9641
+  Accuracy    | 0.9138
+  Precision   | 0.8750
+  Recall      | 0.8235
+----------------------------------------
+
+============================================================
+FEATURE: AGE | CLUSTERS: 2 | METHOD: Medical Thresholds
+============================================================
+
+📊 GLOBAL MODEL METRICS (on all combined test data, n=78):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.6792
+  ROC-AUC     | 0.8639
+  Accuracy    | 0.7821
+  Precision   | 0.7826
+  Recall      | 0.6000
+============================================================
+
+📋 PER-CLUSTER METRICS:
+Client 1 - Younger (n=367):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.5455
+  ROC-AUC     | 0.9286
+  Accuracy    | 0.8649
+  Precision   | 0.7500
+  Recall      | 0.4286
+----------------------------------------
+Client 2 - Older (n=401):
+  Metric      | Value    
+  ------------|----------
+  F1-Score    | 0.7143
+  ROC-AUC     | 0.7705
+  Accuracy    | 0.7073
+  Precision   | 0.7895
+  Recall      | 0.6522
+----------------------------------------

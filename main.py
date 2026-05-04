@@ -12,24 +12,26 @@ from uncertainty_evaluation import analyze_uncertainty, generate_uncertainty_rep
 # =====================================================
 # CONFIGURATION
 # =====================================================
-DATASET_NUMBER = 3
+DATASET_NUMBER = 1
 
 DATASET_CONFIGS = {
-    # Dataset 1: 100k rows — SVGP, Matérn 2.5, Bernoulli(MC), no standardization, oversampling ON
+    # Dataset 1: 100k rows — SVGP, Matérn 2.5, Gaussian(Regression), no standardization
     1: {
         "NUM_INDUCING_POINTS": 1000,
         "KERNEL_TYPE": "matern",
         "STANDARDIZE": False,
         "NUM_FL_ROUNDS": 8,
         "LOCAL_EPOCHS_PER_ROUND": 80,
+        "GP_TASK": "regression",
     },
-    # Dataset 2: 769 rows (Pima Indians) — ExactGP, Matérn 2.5, Gaussian(Laplace), standardization ON, oversampling OFF
+    # Dataset 2: 769 rows (Pima Indians) — ExactGP, Matérn 2.5, Gaussian(Regression), standardization ON
     2: {
         "NUM_INDUCING_POINTS": 75,
         "KERNEL_TYPE": "matern",
         "STANDARDIZE": True,
-        "NUM_FL_ROUNDS": 7,
+        "NUM_FL_ROUNDS": 2,
         "LOCAL_EPOCHS_PER_ROUND": 80,
+        "GP_TASK": "regression",
     },
     # Dataset 3: 70k rows (BRFSS 50/50 split) — SVGP, Matérn 2.5, Gaussian(Regression), standardization ON, 8 features
     3: {

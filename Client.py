@@ -117,9 +117,10 @@ class Client:
         # Auto-select model based on task and training set size:
         #   classification, small  (< 2000): ExactGP + GaussianLikelihood + ExactMLL + Laplace probit
         #   classification, sparse (≥ 2000): SVGP  + BernoulliLikelihood  + VariationalELBO + MC samples
-        #   regression             (any n)  : SVGP  + GaussianLikelihood   + VariationalELBO + GP mean
+        #   regression, small      (< 2000): ExactGP + GaussianLikelihood + ExactMLL + GP mean clipped
+        #   regression, sparse     (≥ 2000): SVGP  + GaussianLikelihood   + VariationalELBO + GP mean
         if self.task == "regression":
-            self.model_type = "sparse_regression"
+            self.model_type = "exact_regression" if train_end < 2000 else "sparse_regression"
         else:
             self.model_type = "small" if train_end < 2000 else "sparse"
 
@@ -170,6 +171,17 @@ class Client:
             self.model.covar_module.outputscale = torch.tensor(4.0)
             self.model.covar_module.base_kernel.lengthscale = torch.tensor([[0.5]])
             print(f"Client {self.id}: SparseGP+Bernoulli+{self.kernel_type} | {actual_num_inducing} inducing")
+        elif self.model_type == "exact_regression":
+            # ExactGP + GaussianLikelihood for regression on {0,1} targets (small datasets only).
+            # Predictions are GP posterior means clipped to [0,1]; threshold search finds the decision boundary.
+            self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+            self.model = SmallDatasetGPModel(self.train_x, self.train_y, self.likelihood, kernel)
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
+            self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+            self.model.covar_module.outputscale = torch.tensor(1.0)
+            self.model.covar_module.base_kernel.lengthscale = torch.tensor([[1.0]])
+            self.likelihood.noise = torch.tensor(0.1)
+            print(f"Client {self.id}: ExactGP+Gaussian(Regression)+{self.kernel_type} | n_train={len(self.train_x)}")
         else:  # sparse_regression
             # SparseGP + GaussianLikelihood for regression on {0,1} targets.
             # Predictions are GP means clipped to [0,1]; threshold search then finds the decision boundary.
@@ -192,7 +204,7 @@ class Client:
 
     def _build_kernel(self):
         k = gpytorch.kernels.MaternKernel(nu=2.5)
-        k.register_constraint("raw_lengthscale", gpytorch.constraints.Interval(0.1, 3.0))
+        k.register_constraint("raw_lengthscale", gpytorch.constraints.Interval(0.01, 20.0))
         return k
 
     def train_local(self, training_iter=50):
@@ -204,6 +216,8 @@ class Client:
 
         if self.model_type == "small":
             self.model.set_train_data(self.train_x, 2.0 * self.train_y - 1.0, strict=False)
+        elif self.model_type == "exact_regression":
+            self.model.set_train_data(self.train_x, self.train_y, strict=False)
 
         pos_ratio = self.train_y.mean().item()
         pre_os = self.model.covar_module.outputscale.item()
@@ -217,6 +231,10 @@ class Client:
                 # ExactMLL with {-1,+1} targets — latent f spans (-∞,+∞) for valid probit
                 output = self.model(self.train_x)
                 loss = -self.mll(output, 2.0 * self.train_y - 1.0)
+            elif self.model_type == "exact_regression":
+                # ExactMLL with raw {0,1} targets — GP mean regresses directly onto labels
+                output = self.model(self.train_x)
+                loss = -self.mll(output, self.train_y)
             elif self.model_type == "sparse":
                 # VariationalELBO with BernoulliLikelihood — requires MC integration
                 with gpytorch.settings.num_likelihood_samples(16):
@@ -268,6 +286,12 @@ class Client:
                 # Probit correction — shrinks latent mean by posterior uncertainty
                 kappa = 1.0 / np.sqrt(1.0 + np.pi / 8.0 * np.clip(var, 0, None))
                 return (1.0 / (1.0 + np.exp(-kappa * mu))).flatten()
+            elif self.model_type == "exact_regression":
+                # ExactGP posterior mean clipped to [0,1] as a regression probability estimate
+                with gpytorch.settings.fast_pred_var():
+                    pred = self.likelihood(self.model(X_tensor))
+                    mu = pred.mean.detach().cpu().numpy()
+                return np.clip(mu, 0.0, 1.0).flatten()
             elif self.model_type == "sparse":
                 with gpytorch.settings.num_likelihood_samples(64):
                     pred = self.likelihood(self.model(X_tensor))
@@ -384,7 +408,7 @@ class Client:
         length_scale = self.model.covar_module.base_kernel.lengthscale.item()
         mean_constant = self.model.mean_module.constant.item()
         params = [np.log(output_scale), np.log(length_scale), mean_constant]
-        if self.model_type == "sparse_regression":
+        if self.model_type in ("sparse_regression", "exact_regression"):
             noise = self.likelihood.noise.item()
             params.append(np.log(max(noise, 1e-6)))
         return np.array(params)
@@ -400,10 +424,10 @@ class Client:
         self.model.covar_module.base_kernel.lengthscale = torch.tensor([[new_length_scale]])
         self.model.mean_module.constant.data = torch.tensor(new_mean_constant)
 
-        if self.model_type == "sparse_regression" and len(params) > 3:
+        if self.model_type in ("sparse_regression", "exact_regression") and len(params) > 3:
             self.likelihood.noise = torch.tensor(float(np.exp(params[3])))
 
-        if self.model_type == "small":
+        if self.model_type in ("small", "exact_regression"):
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)
         else:
             self.optimizer = torch.optim.Adam([
